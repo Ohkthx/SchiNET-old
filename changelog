@@ -1,1 +1,11 @@
+0.1.1 - Additions:
+            - Processing input from console.
+            - Wrapper structure, with clean up function.
+            - Proper message handler.
+            - Input parsing into IOdat structure.
+            - Functions for converting strings and structs to IOdat.
+        Fixes:
+            - Removed "Global" structure.
+            - Minor README issues.
+
 0.1.0 - Initial commit.
