@@ -14,7 +14,7 @@ func (b *bot) core() {
 	for {
 		fmt.Printf("[%s] > ", time.Now().Format(time.Stamp))
 		input, _ := reader.ReadString('\n')
-		s := strToSlice(input)
+		_, s := strToCommands(input)
 		iodat := sliceToIOdat(b.Core, s)
 
 		if len(iodat.io) > 0 {

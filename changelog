@@ -1,3 +1,11 @@
+0.1.2 - Additions:
+            - Storing and Retrieving documents from MongoDB.
+            - Several "small" unimportant commands for bot message parsing tests.
+            - BOT_DBURL constant for setting URL/IP for MongoDB.
+        Fixes:
+            - Function renames, more appropriate.
+            - README updated with MGO.
+
 0.1.1 - Additions:
             - Processing input from console.
             - Wrapper structure, with clean up function.

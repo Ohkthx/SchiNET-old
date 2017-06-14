@@ -7,8 +7,11 @@ import (
 	"github.com/d0x1p2/godbot"
 )
 
+// Constants used to initiate and customize bot.
 var (
-	envToken = os.Getenv("DG_TOKEN")
+	_version = "0.1.2"
+	envToken = os.Getenv("BOT_TOKEN")
+	envDBUrl = os.Getenv("BOT_DBURL")
 )
 
 func main() {
