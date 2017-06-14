@@ -35,3 +35,11 @@ type DBdat struct {
 	Document   interface{}
 	Query      bson.M
 }
+
+// Event has information regarding upcoming events.
+type Event struct {
+	Description string
+	Day         string
+	Time        string
+	AddedBy     godbot.User
+}

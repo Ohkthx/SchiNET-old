@@ -12,16 +12,32 @@ func strToCommands(io string) (bool, []string) {
 
 	var slice []string
 	var help bool
+	var quoted bool
+	var quote string
+
 	s := strings.Fields(io)
 
 	for _, w := range s {
 		if strings.HasPrefix(w, ",") {
 			w = strings.TrimPrefix(w, ",")
+		} else if strings.HasPrefix(w, "\"") && quoted == false {
+			w = strings.TrimPrefix(w, "\"")
+			quote += w + " "
+			quoted = true
+		} else if strings.HasSuffix(w, "\"") && quoted {
+			w = strings.TrimSuffix(w, "\"")
+			quote += w
+			w = quote
+			quoted = false
+
+		} else if quoted {
+			quote += w + " "
 		}
-		if strings.ToLower(w) != "help" {
-			slice = append(slice, w)
-		} else {
+
+		if strings.ToLower(w) == "help" {
 			help = true
+		} else if quoted == false {
+			slice = append(slice, w)
 		}
 	}
 
@@ -41,7 +57,7 @@ func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 
 func sliceToIOdat(b *godbot.Core, s []string) *IOdat {
 	var io IOdat
-	io.user = b.GetBotUser()
+	io.user.User = b.User
 	io.help, io.io = strToCommands(strings.Join(s, " "))
 
 	return &io
@@ -63,6 +79,8 @@ func (io *IOdat) ioHandler() (err error) {
 		io.miscRoll()
 	case "top10":
 		io.miscTop10()
+	case "add", "del", "edit":
+		err = io.dbCore()
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return

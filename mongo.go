@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 
+	"github.com/d0x1p2/godbot"
+
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -59,5 +61,27 @@ func (d *DBdat) dbGet(i interface{}) error {
 	}
 
 	d.Document = i
+	return nil
+}
+
+func (io *IOdat) dbCore() (err error) {
+	var dbdat *DBdat
+	var guild *godbot.Guild
+	if Bot != nil {
+		guild = Bot.GetGuild(Bot.GetChannel(io.msg.ChannelID).GuildID)
+	}
+
+	switch io.io[1] {
+	case "event":
+		var e = Event{Day: io.io[2], Time: io.io[3], Description: io.io[4], AddedBy: io.user}
+		dbdat = DBdatCreate(guild.Name, "events", e, nil)
+	}
+	switch io.io[0] {
+	case "add":
+		err = dbdat.dbInsert()
+	case "edit":
+	case "del":
+	}
+
 	return nil
 }

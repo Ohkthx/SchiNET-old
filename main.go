@@ -9,10 +9,13 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version = "0.1.2"
+	_version = "0.1.3"
 	envToken = os.Getenv("BOT_TOKEN")
 	envDBUrl = os.Getenv("BOT_DBURL")
 )
+
+// Bot Global interface for pulling discord information.
+var Bot *godbot.Core
 
 func main() {
 
@@ -35,6 +38,7 @@ func main() {
 	}
 
 	binfo.Core = bot
+	Bot = bot
 	binfo.core()
 
 }
