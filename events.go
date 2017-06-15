@@ -95,7 +95,7 @@ func (io *IOdat) miscDelEvent() error {
 		return err
 	}
 
-	msg := fmt.Sprintf("<@%s> removed the event on **%s** at **%s**.", io.user.User.ID, io.io[2], io.io[3])
+	msg := fmt.Sprintf("<@%s> removed the event on **%s** at **%s**.", io.user.ID, io.io[2], io.io[3])
 	io.msgEmbed = embedCreator(msg, ColorMaroon)
 
 	return nil

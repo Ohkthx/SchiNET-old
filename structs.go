@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"time"
@@ -34,6 +35,7 @@ type IOdat struct {
 
 // DBdat passes information as to what to store into a database.
 type DBdat struct {
+	Handler    *mgo.Session
 	Database   string
 	Collection string
 	Document   interface{}
@@ -54,9 +56,12 @@ type Event struct {
 
 // User is a wrapper with additional functionality.
 type User struct {
-	*discordgo.User
-	Credits      int
-	CreditsTotal int
+	ID            string
+	Username      string
+	Discriminator string
+	Bot           bool
+	Credits       int
+	CreditsTotal  int
 }
 
 // DBMsg stores information on messages last processed.
@@ -66,6 +71,11 @@ type DBMsg struct {
 	MIDr    string // Message ID of most recent.
 	MIDf    string // Message ID of first message.
 	Content string
+}
+
+//DBHandler Stores a MongoDB connection.
+type DBHandler struct {
+	*mgo.Session
 }
 
 // Command structure for User Defined commands.

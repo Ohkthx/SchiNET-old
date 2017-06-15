@@ -1,4 +1,16 @@
-0.1.4 - Additons:
+0.2.0 - Additions:
+            - Gamble system implemented.
+            - Further changes to message archiving.
+            - Changes to perform additional User message counting.
+            - Error printing to channel (NEED TO CHANGE EVENTUALLY)
+            - Global variable for Database access to increase read/writes.
+            - Ability to retrieve user data from database.
+            - Constant for Command Prefix.
+            - Special userEmbedCreate to print out user data.
+        Fixes:
+            - Changed User struct. 
+
+0.1.4 - Additions:
             - Message processing of past messages. Saves to database.
             - Base Gambling features. NOT FUNCTIONAL... yet.
             - Error handling on Unknown type retrieved from database.

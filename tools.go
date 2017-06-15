@@ -37,8 +37,8 @@ func strToCommands(io string) (bool, []string) {
 	s := strings.Fields(io)
 
 	for _, w := range s {
-		if strings.HasPrefix(w, ",") {
-			w = strings.TrimPrefix(w, ",")
+		if strings.HasPrefix(w, envCMDPrefix) {
+			w = strings.TrimPrefix(w, envCMDPrefix)
 		} else if strings.HasPrefix(w, "\"") && quoted == false {
 			w = strings.TrimPrefix(w, "\"")
 			quote += w + " "
@@ -65,20 +65,20 @@ func strToCommands(io string) (bool, []string) {
 
 func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 	var io IOdat
+	u := msg.Author
 
 	io.help, io.io = strToCommands(msg.Content)
 	io.input = msg.Content
-	io.user = &User{}
-	io.user.User = msg.Author
+	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
 	io.msg = msg
 
 	return &io
 }
 
 func sliceToIOdat(b *godbot.Core, s []string) *IOdat {
+	u := b.User
 	var io IOdat
-	io.user = &User{}
-	io.user.User = b.User
+	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
 	io.help, io.io = strToCommands(strings.Join(s, " "))
 
 	return &io
@@ -93,6 +93,10 @@ func tsSplit(r rune) bool {
 	return r == 'T' || r == '.' || r == '+'
 }
 
+func idSplit(r rune) bool {
+	return r == '<' || r == '@' || r == '>'
+}
+
 func (io *IOdat) ioHandler() (err error) {
 	command := io.io[0]
 	switch strings.ToLower(command) {
@@ -102,6 +106,8 @@ func (io *IOdat) ioHandler() (err error) {
 		io.miscTop10()
 	case "gamble":
 		err = io.creditsGamble()
+	case "credits", "user", "xfer":
+		err = io.creditsPrint()
 	case "event", "events":
 		fallthrough
 	case "add", "del", "edit":
@@ -142,6 +148,12 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 		}
 		for n, m := range m {
 			msgTotal++
+			// Update user here.
+			err = userUpdate(m.ChannelID, m.Author, 1)
+			if err != nil {
+				fmt.Println("updating users credits", err)
+			}
+
 			if dbm.MIDr == "" {
 				dbm.MIDr = m.ID
 				dbm.Content = m.Content
@@ -189,6 +201,11 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 			}
 			dbm.MTotal++
 			msgTotal++
+			// Update users credits.
+			err = userUpdate(m.ChannelID, m.Author, 1)
+			if err != nil {
+				fmt.Println("updating users credits", err)
+			}
 			// Break at Ending Message.
 			if msgAmt < 100 && msgAmt == n+1 {
 				return dbm, ErrMsgEnding
@@ -300,4 +317,84 @@ func messagesGet(cID string) (*DBMsg, error) {
 	u = dbdat.Document.(DBMsg)
 
 	return &u, nil
+}
+
+func userUpdate(cID string, us *discordgo.User, spoils int) error {
+	var q = make(map[string]interface{})
+	var c = make(map[string]interface{})
+
+	gID, err := Bot.GetGuildID(cID)
+	if err != nil {
+		return err
+	}
+	g := Bot.GetGuild(gID)
+
+	var totalInc = 1
+	if spoils != 1 {
+		totalInc = 0
+	}
+
+	var u = User{
+		ID:            us.ID,
+		Username:      us.Username,
+		Discriminator: us.Discriminator,
+		Bot:           us.Bot,
+		CreditsTotal:  1,
+		Credits:       1,
+	}
+
+	q["id"] = u.ID
+	c["$inc"] = bson.M{"creditstotal": totalInc, "credits": spoils}
+	var dbdat = DBdatCreate(g.Name, CollectionUsers, u, q, c)
+
+	err = dbdat.dbEdit(User{})
+	if err != nil {
+		if err != mgo.ErrNotFound {
+			return err
+		}
+		// Add to DB since it doesn't exist.
+		err = dbdat.dbInsert()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func userGet(cID, uID string) (*User, error) {
+	var q = make(map[string]interface{})
+
+	gID, err := Bot.GetGuildID(cID)
+	if err != nil {
+		return nil, err
+	}
+	g := Bot.GetGuild(gID)
+
+	q["id"] = uID
+	var dbdat = DBdatCreate(g.Name, CollectionUsers, User{}, q, nil)
+	err = dbdat.dbGet(User{})
+	if err != nil {
+		return nil, err
+	}
+
+	var u User
+	u = dbdat.Document.(User)
+
+	return &u, nil
+}
+
+func userEmbedCreate(u *User) *discordgo.MessageEmbed {
+	description := fmt.Sprintf("```C\n"+
+		"%-13s: %-18s %7d %s\n"+
+		"%-13s: %-18s %7d %s```",
+		"Username", fmt.Sprintf("%s#%s", u.Username, u.Discriminator), u.Credits, GambleCredits,
+		"ID", u.ID, u.CreditsTotal, "rep")
+
+	return &discordgo.MessageEmbed{
+		Author:      &discordgo.MessageEmbedAuthor{},
+		Color:       ColorBlue,
+		Description: description,
+		Fields:      []*discordgo.MessageEmbedField{},
+	}
 }

@@ -29,20 +29,16 @@ const (
 
 // DBdatCreate creates a database object used to get exchange information with mongodb
 func DBdatCreate(db, coll string, doc interface{}, q bson.M, c bson.M) *DBdat {
-	return &DBdat{Database: db, Collection: coll, Document: doc, Query: q, Change: c}
+	return &DBdat{Handler: Mgo, Database: db, Collection: coll, Document: doc, Query: q, Change: c}
 }
 
 func (d *DBdat) dbInsert() error {
-
+	var err error
 	if d.Document == nil {
 		return ErrNilInterface
 	}
 
-	mdb, err := mgo.Dial(envDBUrl)
-	if err != nil {
-		return err
-	}
-	defer mdb.Close()
+	mdb := d.Handler
 
 	//mdb.SetMode(mgo.Monotonic, true)
 
@@ -55,6 +51,7 @@ func (d *DBdat) dbInsert() error {
 }
 
 func (d *DBdat) dbEdit(i interface{}) error {
+	var err error
 	if d.Query == nil {
 		return ErrNilQuery
 	} else if d.Change == nil {
@@ -66,12 +63,7 @@ func (d *DBdat) dbEdit(i interface{}) error {
 		ReturnNew: true,
 	}
 
-	mdb, err := mgo.Dial(envDBUrl)
-	if err != nil {
-		return err
-	}
-	defer mdb.Close()
-
+	mdb := d.Handler
 	//mdb.SetMode(mgo.Monotonic, true)
 
 	c := mdb.DB(d.Database).C(d.Collection)
@@ -84,11 +76,9 @@ func (d *DBdat) dbEdit(i interface{}) error {
 }
 
 func (d *DBdat) dbDelete(id bson.ObjectId) error {
-	mdb, err := mgo.Dial(envDBUrl)
-	if err != nil {
-		return err
-	}
-	defer mdb.Close()
+	var err error
+
+	mdb := d.Handler
 
 	//mdb.SetMode(mgo.Monotonic, true)
 
@@ -103,15 +93,12 @@ func (d *DBdat) dbDelete(id bson.ObjectId) error {
 
 func (d *DBdat) dbGet(i interface{}) error {
 	var unk interface{}
+	var err error
 	if d.Query == nil {
 		return ErrNilInterface
 	}
 
-	mdb, err := mgo.Dial(envDBUrl)
-	if err != nil {
-		return err
-	}
-	defer mdb.Close()
+	mdb := d.Handler
 
 	c := mdb.DB(d.Database).C(d.Collection)
 	err = c.Find(d.Query).One(&unk)
@@ -132,11 +119,9 @@ func (d *DBdat) dbGet(i interface{}) error {
 
 func (d *DBdat) dbGetAll(i interface{}) error {
 	var unk []interface{}
-	mdb, err := mgo.Dial(envDBUrl)
-	if err != nil {
-		return err
-	}
-	defer mdb.Close()
+	var err error
+
+	mdb := d.Handler
 
 	c := mdb.DB(d.Database).C(d.Collection)
 	err = c.Find(nil).All(&unk)
@@ -200,6 +185,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var d DBMsg
 		bson.Unmarshal(byt, &d)
 		return d, nil
+	case User:
+		var u User
+		bson.Unmarshal(byt, &u)
+		return u, nil
 	default:
 		return nil, ErrBadInterface
 	}

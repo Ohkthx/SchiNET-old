@@ -4,18 +4,24 @@ import (
 	"fmt"
 	"os"
 
+	mgo "gopkg.in/mgo.v2"
+
 	"github.com/d0x1p2/godbot"
 )
 
 // Constants used to initiate and customize bot.
 var (
-	_version = "0.1.4"
-	envToken = os.Getenv("BOT_TOKEN")
-	envDBUrl = os.Getenv("BOT_DBURL")
+	_version     = "0.1.4"
+	envToken     = os.Getenv("BOT_TOKEN")
+	envDBUrl     = os.Getenv("BOT_DBURL")
+	envCMDPrefix = os.Getenv("BOT_PREFIX")
 )
 
 // Bot Global interface for pulling discord information.
 var Bot *godbot.Core
+
+// Mgo is for the global database session.
+var Mgo *mgo.Session
 
 func main() {
 
@@ -39,6 +45,11 @@ func main() {
 
 	binfo.Core = bot
 	Bot = bot
+	Mgo, err = mgo.Dial(envDBUrl)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	err = messagesProcessStartup()
 	if err != nil {
@@ -52,6 +63,7 @@ func main() {
 
 func (b *bot) cleanup() {
 	b.Stop()
+	Mgo.Close()
 	fmt.Println("Bot stopped, exiting.")
 	os.Exit(0)
 }
