@@ -26,7 +26,7 @@ type IOdat struct {
 	input  string
 	output string
 
-	user     godbot.User
+	user     *User
 	guild    *godbot.Guild
 	msg      *discordgo.MessageCreate
 	msgEmbed *discordgo.MessageEmbed
@@ -49,7 +49,23 @@ type Event struct {
 	Day         string
 	Time        time.Time
 	Protected   bool
-	AddedBy     godbot.User
+	AddedBy     *User
+}
+
+// User is a wrapper with additional functionality.
+type User struct {
+	*discordgo.User
+	Credits      int
+	CreditsTotal int
+}
+
+// DBMsg stores information on messages last processed.
+type DBMsg struct {
+	ID      string
+	MTotal  int
+	MIDr    string // Message ID of most recent.
+	MIDf    string // Message ID of first message.
+	Content string
 }
 
 // Command structure for User Defined commands.

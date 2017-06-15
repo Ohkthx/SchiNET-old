@@ -1,15 +1,36 @@
 package main
 
-import "github.com/bwmarrin/discordgo"
+import (
+	"fmt"
+
+	"github.com/bwmarrin/discordgo"
+)
 
 func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
-
-	if m.Author.Bot {
+	var err error
+	c, err := s.Channel(m.ChannelID)
+	if err != nil {
 		return
 	}
 
+	if m.Author.Bot {
+		return
+	} else if c.IsPrivate == false {
+		var d *DBMsg
+		d, err = messagesGet(m.ChannelID)
+		if err == nil {
+			d.MIDr = m.ID
+			d.MTotal++
+			d.Content = m.Content
+			err = messagesUpdate(d)
+		}
+		if err != nil {
+			fmt.Println("updating recent message db", err)
+		}
+	}
+
 	var io = msgToIOdat(m)
-	var err = io.ioHandler()
+	err = io.ioHandler()
 	if err != nil {
 		// Log error here.
 		return

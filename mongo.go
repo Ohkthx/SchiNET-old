@@ -14,6 +14,7 @@ var (
 	ErrNilQuery     = errors.New("nil interface provided")
 	ErrNilChange    = errors.New("nil change provided")
 	ErrUnknownType  = errors.New("unknown type")
+	ErrBadInterface = errors.New("bad interface, unknown in switch")
 )
 
 // Collection constants
@@ -22,6 +23,8 @@ const (
 	CollectionUsers     = "users"
 	CollectionMessages  = "messages"
 	CollectionBlacklist = "blacklist"
+	CollectionGamble    = "gamble"
+	CollectionConfigs   = "config"
 )
 
 // DBdatCreate creates a database object used to get exchange information with mongodb
@@ -116,7 +119,13 @@ func (d *DBdat) dbGet(i interface{}) error {
 		return err
 	}
 
-	d.Document = handlerForInterface(i, unk)
+	if unk == nil {
+		return mgo.ErrNotFound
+	}
+	d.Document, err = handlerForInterface(i, unk)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -136,7 +145,10 @@ func (d *DBdat) dbGetAll(i interface{}) error {
 	}
 
 	for _, p := range unk {
-		h := handlerForInterface(i, p)
+		h, err := handlerForInterface(i, p)
+		if err != nil {
+			return err
+		}
 		d.Documents = append(d.Documents, h)
 	}
 
@@ -177,13 +189,18 @@ func (io *IOdat) dbCore() (err error) {
 	return nil
 }
 
-func handlerForInterface(handler interface{}, i interface{}) interface{} {
+func handlerForInterface(handler interface{}, i interface{}) (interface{}, error) {
+	byt, _ := bson.Marshal(i)
 	switch handler.(type) {
 	case Event:
 		var e Event
-		byt, _ := bson.Marshal(i)
 		bson.Unmarshal(byt, &e)
-		return e
+		return e, nil
+	case DBMsg:
+		var d DBMsg
+		bson.Unmarshal(byt, &d)
+		return d, nil
+	default:
+		return nil, ErrBadInterface
 	}
-	return nil
 }

@@ -9,7 +9,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version = "0.1.3"
+	_version = "0.1.4"
 	envToken = os.Getenv("BOT_TOKEN")
 	envDBUrl = os.Getenv("BOT_DBURL")
 )
@@ -39,6 +39,13 @@ func main() {
 
 	binfo.Core = bot
 	Bot = bot
+
+	err = messagesProcessStartup()
+	if err != nil {
+		fmt.Println("messageProcessStartup()", err)
+		return
+	}
+
 	binfo.core()
 
 }

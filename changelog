@@ -1,3 +1,10 @@
+0.1.4 - Additons:
+            - Message processing of past messages. Saves to database.
+            - Base Gambling features. NOT FUNCTIONAL... yet.
+            - Error handling on Unknown type retrieved from database.
+        Fixes:
+            - Accessing nil structs member because io.User wasn't initialized.
+
 0.1.3 - Additions:
             - dbCore for processing all Database functions.
             - Events can not be printed to the channel requested from.

@@ -1,11 +1,20 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
+	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
+)
+
+// Error constants.
+var (
+	ErrMsgEnding = errors.New("reached ending message")
 )
 
 // Color constants for embeded messages.
@@ -59,6 +68,7 @@ func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 
 	io.help, io.io = strToCommands(msg.Content)
 	io.input = msg.Content
+	io.user = &User{}
 	io.user.User = msg.Author
 	io.msg = msg
 
@@ -67,6 +77,7 @@ func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 
 func sliceToIOdat(b *godbot.Core, s []string) *IOdat {
 	var io IOdat
+	io.user = &User{}
 	io.user.User = b.User
 	io.help, io.io = strToCommands(strings.Join(s, " "))
 
@@ -89,6 +100,8 @@ func (io *IOdat) ioHandler() (err error) {
 		io.miscRoll()
 	case "top10":
 		io.miscTop10()
+	case "gamble":
+		err = io.creditsGamble()
 	case "event", "events":
 		fallthrough
 	case "add", "del", "edit":
@@ -107,4 +120,184 @@ func embedCreator(description string, color int) *discordgo.MessageEmbed {
 		Description: description,
 		Fields:      []*discordgo.MessageEmbedField{},
 	}
+}
+
+// Archives messages from most RECENT to OLDEST. Returns last processed.
+func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
+	// cID  - Channel ID to search.
+	// mID  - Message ID to START from.
+	// emID - Ending Message ID to STOP at.
+	s := Bot.Session
+	var msgTotal int
+	var dbm = &DBMsg{ID: cID}
+
+	for {
+		m, err := s.ChannelMessages(cID, 100, mID, "", "")
+		if err != nil {
+			return nil, err
+		}
+		var msgAmt = len(m)
+		if msgAmt == 0 {
+			return nil, ErrMsgEnding
+		}
+		for n, m := range m {
+			msgTotal++
+			if dbm.MIDr == "" {
+				dbm.MIDr = m.ID
+				dbm.Content = m.Content
+			}
+			// Break at Ending Message.
+			if m.ID == emID && emID != "" {
+				dbm.MTotal = msgTotal
+				dbm.MIDf = m.ID
+				return dbm, ErrMsgEnding
+			} else if msgAmt < 100 && msgAmt == n+1 {
+				dbm.MTotal = msgTotal
+				dbm.MIDf = m.ID
+				return dbm, ErrMsgEnding
+			} else {
+				mID = m.ID
+			}
+			fmt.Printf("\r%7d messages processed.", msgTotal)
+		}
+	}
+}
+
+// Gets messages from OLDEST to most RECENT. Returns last processed.
+func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
+	// cID  - Channel ID to search.
+	// mID  - Message to START from.
+	// emID - Message to STOP at.
+	s := Bot.Session
+	var msgTotal int
+	var mID = dbm.MIDr
+	for {
+		// before, after, around
+		m, err := s.ChannelMessages(dbm.ID, 100, "", mID, "")
+		if err != nil {
+			return nil, err
+		}
+		var msgAmt = len(m)
+		if msgAmt == 0 {
+			// No messages, nil will not update.
+			return dbm, ErrMsgEnding
+		}
+		for n, m := range m {
+			if msgTotal == 0 {
+				dbm.Content = m.Content
+				dbm.MIDr = m.ID
+			}
+			dbm.MTotal++
+			msgTotal++
+			// Break at Ending Message.
+			if msgAmt < 100 && msgAmt == n+1 {
+				return dbm, ErrMsgEnding
+			}
+
+			mID = m.ID
+			fmt.Printf("\r%7d messages processed.", msgTotal)
+		}
+	}
+}
+
+func messagesProcessStartup() error {
+
+	for n, c := range Bot.Channels {
+		var lastID string
+		var dbm *DBMsg
+
+		dbmsg, err := messagesGet(c.ID)
+		if err != nil {
+			if err != mgo.ErrNotFound {
+				return err
+			}
+			lastID = ""
+		} else if dbmsg != nil {
+			lastID = dbmsg.MIDr
+		}
+
+		fmt.Printf("\n[%d] Processing [%s]", n, c.ID)
+
+		if lastID == "" {
+			dbm, err = messagesToPast(c.ID, lastID, "")
+			if err != nil {
+				if err != ErrMsgEnding {
+					//return err
+					continue
+				}
+			}
+		} else {
+			dbm, err = messagesToPresent(dbmsg)
+			if err != nil {
+				if err != ErrMsgEnding {
+					//return err
+					continue
+				}
+			}
+		}
+		fmt.Printf("\r[%d] Processed  [%s]", n, c.ID)
+
+		// Update Database with last processed message.
+		if dbm != nil {
+			err = messagesUpdate(dbm)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	fmt.Println()
+
+	return nil
+
+}
+
+func messagesUpdate(dbm *DBMsg) error {
+	var q = make(map[string]interface{})
+	var c = make(map[string]interface{})
+
+	gID, err := Bot.GetGuildID(dbm.ID)
+	if err != nil {
+		return err
+	}
+	g := Bot.GetGuild(gID)
+
+	q["id"] = dbm.ID
+	c["$set"] = bson.M{"id": dbm.ID, "mtotal": dbm.MTotal, "midr": dbm.MIDr, "content": dbm.Content}
+	var dbdat = DBdatCreate(g.Name, CollectionConfigs, dbm, q, c)
+
+	err = dbdat.dbEdit(DBMsg{})
+	if err != nil {
+		if err != mgo.ErrNotFound {
+			return err
+		}
+		// Add to DB since it doesn't exist.
+		err = dbdat.dbInsert()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func messagesGet(cID string) (*DBMsg, error) {
+	var q = make(map[string]interface{})
+
+	gID, err := Bot.GetGuildID(cID)
+	if err != nil {
+		return nil, err
+	}
+	g := Bot.GetGuild(gID)
+
+	q["id"] = cID
+	var dbdat = DBdatCreate(g.Name, CollectionConfigs, DBMsg{}, q, nil)
+	err = dbdat.dbGet(DBMsg{})
+	if err != nil {
+		return nil, err
+	}
+
+	var u DBMsg
+	u = dbdat.Document.(DBMsg)
+
+	return &u, nil
 }
