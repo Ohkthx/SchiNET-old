@@ -13,7 +13,8 @@ func (io *IOdat) miscRoll() {
 	roll1 = r.Intn(6) + 1
 	roll2 = r.Intn(6) + 1
 
-	msg := fmt.Sprintf("```*%s rolls %d, %d*```", io.user.Username, roll1, roll2)
+	msg := fmt.Sprintf("*%s rolls %d, %d*", io.user.Username, roll1, roll2)
+	io.msgEmbed = embedCreator(msg, ColorBlue)
 
 	io.rm = true
 	io.output = msg

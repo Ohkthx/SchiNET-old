@@ -21,8 +21,10 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Send message here.
-	if len(io.io) > 0 && io.output != "" {
+	if len(io.io) > 0 && io.output != "" && io.msgEmbed == nil {
 		_, _ = s.ChannelMessageSend(m.ChannelID, io.output)
+	} else if io.msgEmbed != nil {
+		s.ChannelMessageSendEmbed(m.ChannelID, io.msgEmbed)
 	}
 
 	return

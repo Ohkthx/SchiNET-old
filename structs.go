@@ -5,6 +5,8 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
+	"time"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
 )
@@ -24,8 +26,10 @@ type IOdat struct {
 	input  string
 	output string
 
-	user godbot.User
-	msg  *discordgo.MessageCreate
+	user     godbot.User
+	guild    *godbot.Guild
+	msg      *discordgo.MessageCreate
+	msgEmbed *discordgo.MessageEmbed
 }
 
 // DBdat passes information as to what to store into a database.
@@ -33,13 +37,22 @@ type DBdat struct {
 	Database   string
 	Collection string
 	Document   interface{}
+	Documents  []interface{}
 	Query      bson.M
+	Change     bson.M
 }
 
 // Event has information regarding upcoming events.
 type Event struct {
+	ID          bson.ObjectId `bson:"_id,omitempty"`
 	Description string
 	Day         string
-	Time        string
+	Time        time.Time
+	Protected   bool
 	AddedBy     godbot.User
+}
+
+// Command structure for User Defined commands.
+type Command struct {
+	ID bson.ObjectId `bson:"_id,omitempty"`
 }

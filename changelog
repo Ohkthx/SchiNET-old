@@ -1,7 +1,13 @@
-0.1.3  -> [Work in Progress]
-        - Additions:
+0.1.3 - Additions:
             - dbCore for processing all Database functions.
-        - Fixes:
+            - Events can not be printed to the channel requested from.
+            - Support for requesting all documents in a collection for MongoDB.
+            - Embed message support.
+            - Add, Print, Remove Events.
+            - Additional error constants.
+            - Constants for Collections.
+            - Database Editing and Deleting of Documents.
+        Fixes:
             - strToCommands updated with ability to extract quoted text.
             - Updated information to match current bersion of 'godbot'
 

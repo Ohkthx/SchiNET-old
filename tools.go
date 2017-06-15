@@ -8,6 +8,16 @@ import (
 	"github.com/d0x1p2/godbot"
 )
 
+// Color constants for embeded messages.
+const (
+	ColorMaroon = 0x800000
+	ColorGreen  = 0x3B8040
+	ColorBlue   = 0x5B6991
+	ColorBlack  = 0x000000
+	ColorGray   = 0x343434
+	ColorYellow = 0xFEEB65
+)
+
 func strToCommands(io string) (bool, []string) {
 
 	var slice []string
@@ -79,6 +89,8 @@ func (io *IOdat) ioHandler() (err error) {
 		io.miscRoll()
 	case "top10":
 		io.miscTop10()
+	case "event", "events":
+		fallthrough
 	case "add", "del", "edit":
 		err = io.dbCore()
 	case "echo":
@@ -86,4 +98,13 @@ func (io *IOdat) ioHandler() (err error) {
 		return
 	}
 	return
+}
+
+func embedCreator(description string, color int) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Author:      &discordgo.MessageEmbedAuthor{},
+		Color:       color,
+		Description: description,
+		Fields:      []*discordgo.MessageEmbedField{},
+	}
 }
