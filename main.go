@@ -11,7 +11,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version     = "0.1.4"
+	_version     = "0.2.1"
 	envToken     = os.Getenv("BOT_TOKEN")
 	envDBUrl     = os.Getenv("BOT_DBURL")
 	envCMDPrefix = os.Getenv("BOT_PREFIX")
@@ -58,7 +58,6 @@ func main() {
 	}
 
 	binfo.core()
-
 }
 
 func (b *bot) cleanup() {

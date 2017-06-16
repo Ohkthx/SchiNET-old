@@ -13,7 +13,9 @@ import (
 
 // Error constants for misc functions.
 var (
-	ErrBadAmount = errors.New("not enough to gamble")
+	ErrGambleBadAmount = errors.New("bad amount of credits for action")
+	ErrGambleNotMin    = fmt.Errorf("did not provide enough to reach minimum the of %d", GambleMin)
+	ErrGambleNotEnough = errors.New("not enough credits")
 )
 
 // Constants for Gambling.
@@ -57,12 +59,21 @@ func (io *IOdat) creditsGamble() error {
 	if len(io.io) < 2 {
 		return ErrBadArgs
 	}
-	toGamble, err := strconv.Atoi(io.io[1])
-	if err != nil {
-		return ErrBadArgs
-	}
-	if toGamble < GambleMin {
-		return ErrBadAmount
+
+	var all bool
+	var toGamble, spoils int
+	var err error
+
+	if strings.ToLower(io.io[1]) == "all" {
+		all = true
+	} else {
+		toGamble, err = strconv.Atoi(io.io[1])
+		if err != nil {
+			return ErrBadArgs
+		}
+		if toGamble < GambleMin {
+			return ErrGambleNotMin
+		}
 	}
 	// Get user's credits from Database
 
@@ -71,23 +82,41 @@ func (io *IOdat) creditsGamble() error {
 		return err
 	}
 
-	if toGamble > u.Credits {
-		return ErrBadAmount
+	if all != true {
+		if toGamble > u.Credits {
+			return ErrGambleNotEnough
+		}
+		spoils = creditsGambleResult(65, 34, 1, toGamble)
+	} else {
+		toGamble = u.Credits
+		spoils = creditsGambleResult(59, 35, 2, u.Credits)
+		//spoils -= u.Credits
 	}
 
 	var msg string
-	spoils := creditsGambleResult(toGamble)
 	if spoils <= 0 {
 		u.Credits -= toGamble
-		msg = fmt.Sprintf("<@%s> lost %d %s.\n%10d remaining.", io.user.ID, toGamble, GambleCredits, u.Credits)
+		msg = fmt.Sprintf("<@%s> gambled **%d** %s\n"+
+			"Result: **loss**\n"+
+			"%s remaining in bank: **%d**.",
+			io.user.ID, toGamble, GambleCredits, strings.Title(GambleCredits), u.Credits)
 		spoils = -toGamble
 		err = userUpdate(io.msg.ChannelID, Bot.User, toGamble)
 		if err != nil {
 			return err
 		}
 	} else {
-		u.Credits += spoils
-		msg = fmt.Sprintf("<@%s> won %d %s.\n%10d in the bank.", io.user.ID, spoils, GambleCredits, u.Credits)
+		if all {
+			u.Credits = spoils
+			spoils -= toGamble
+		} else {
+			u.Credits += spoils
+		}
+		msg = fmt.Sprintf("<@%s> gambled **%d** %s\n"+
+			"Result: **Won**    spoils: **%d**\n"+
+			"%s remaining in bank: **%d**.",
+			io.user.ID, toGamble, GambleCredits, spoils, strings.Title(GambleCredits), u.Credits)
+
 	}
 
 	err = userUpdate(io.msg.ChannelID, io.msg.Author, spoils)
@@ -100,18 +129,25 @@ func (io *IOdat) creditsGamble() error {
 	return nil
 }
 
-func creditsGambleResult(credits int) int {
+func creditsGambleResult(l, d, t, credits int) int {
 	s1 := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(s1)
 
+	total := l + d + t
+	if total != 100 {
+		l = 60
+		d = 38
+		t = 2
+	}
+
 	num := r1.Intn(100)
-	if num < 60 {
+	if num < l {
 		// Lose all
 		credits = 0
-	} else if num >= 60 && num < 98 {
+	} else if num >= l && num < l+d {
 		// Win x2
 		credits *= 2
-	} else if num >= 98 {
+	} else if num >= l+d {
 		// Win x3
 		credits *= 3
 	}
@@ -122,7 +158,7 @@ func creditsGambleResult(credits int) int {
 func (io *IOdat) creditsTransfer() error {
 	amt, err := strconv.Atoi(io.io[2])
 	if err != nil {
-		return ErrBadAmount
+		return ErrGambleBadAmount
 	}
 
 	s := strings.FieldsFunc(io.io[1], idSplit)

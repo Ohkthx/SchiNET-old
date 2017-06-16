@@ -1,3 +1,11 @@
+0.2.1 - Additions:
+            - Channel Locking and Unlocking while processing for updates.
+            - Gamble error handling improved.
+            - Gamble ALL ability added. Increased chance of winning.
+        Fixes:
+            - Gamble win/loss modifications.
+            - Minor changes to user information printing.
+
 0.2.0 - Additions:
             - Gamble system implemented.
             - Further changes to message archiving.

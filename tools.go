@@ -137,6 +137,15 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 	var msgTotal int
 	var dbm = &DBMsg{ID: cID}
 
+	cl, err := Bot.ChannelLockCreate(cID)
+	if err == nil {
+		err = cl.ChannelLock()
+		if err != nil {
+			return nil, err
+		}
+		defer cl.ChannelUnlock()
+	}
+
 	for {
 		m, err := s.ChannelMessages(cID, 100, mID, "", "")
 		if err != nil {
@@ -183,6 +192,16 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 	s := Bot.Session
 	var msgTotal int
 	var mID = dbm.MIDr
+
+	cl, err := Bot.ChannelLockCreate(dbm.ID)
+	if err == nil {
+		err = cl.ChannelLock()
+		if err != nil {
+			return nil, err
+		}
+		defer cl.ChannelUnlock()
+	}
+
 	for {
 		// before, after, around
 		m, err := s.ChannelMessages(dbm.ID, 100, "", mID, "")
@@ -220,6 +239,9 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 func messagesProcessStartup() error {
 
 	for n, c := range Bot.Channels {
+		if c.Type != "text" {
+			continue
+		}
 		var lastID string
 		var dbm *DBMsg
 
@@ -385,11 +407,13 @@ func userGet(cID, uID string) (*User, error) {
 }
 
 func userEmbedCreate(u *User) *discordgo.MessageEmbed {
-	description := fmt.Sprintf("```C\n"+
-		"%-13s: %-18s %7d %s\n"+
-		"%-13s: %-18s %7d %s```",
-		"Username", fmt.Sprintf("%s#%s", u.Username, u.Discriminator), u.Credits, GambleCredits,
-		"ID", u.ID, u.CreditsTotal, "rep")
+	description := fmt.Sprintf(
+		"__ID: %s__\n"+
+			"**Username**:   %-18s **%s**: %-10d\n"+
+			"**Reputation**: %d",
+		u.ID,
+		fmt.Sprintf("%s#%s", u.Username, u.Discriminator), strings.Title(GambleCredits), u.Credits,
+		u.CreditsTotal)
 
 	return &discordgo.MessageEmbed{
 		Author:      &discordgo.MessageEmbedAuthor{},
