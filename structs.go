@@ -21,11 +21,12 @@ type bot struct {
 // IOdat is input/output processed.
 type IOdat struct {
 	//err  error // Tracking errors.
-	help   bool // If HELP is in the input
-	rm     bool // Remove initial message.
-	io     []string
-	input  string
-	output string
+	help    bool // If HELP is in the input
+	command bool // Flag toggling if it is a command or not.
+	rm      bool // Remove initial message.
+	io      []string
+	input   string
+	output  string
 
 	user     *User
 	guild    *godbot.Guild

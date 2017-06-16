@@ -27,18 +27,19 @@ const (
 	ColorYellow = 0xFEEB65
 )
 
-func strToCommands(io string) (bool, []string) {
+func strToCommands(io string) ([2]bool, []string) {
 
 	var slice []string
-	var help bool
 	var quoted bool
 	var quote string
+	var res [2]bool
 
 	s := strings.Fields(io)
 
 	for _, w := range s {
 		if strings.HasPrefix(w, envCMDPrefix) {
 			w = strings.TrimPrefix(w, envCMDPrefix)
+			res[0] = true
 		} else if strings.HasPrefix(w, "\"") && quoted == false {
 			w = strings.TrimPrefix(w, "\"")
 			quote += w + " "
@@ -54,23 +55,26 @@ func strToCommands(io string) (bool, []string) {
 		}
 
 		if strings.ToLower(w) == "help" {
-			help = true
+			res[1] = true
 		} else if quoted == false {
 			slice = append(slice, w)
 		}
 	}
 
-	return help, slice
+	return res, slice
 }
 
 func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 	var io IOdat
 	u := msg.Author
+	var b [2]bool
 
-	io.help, io.io = strToCommands(msg.Content)
+	b, io.io = strToCommands(msg.Content)
 	io.input = msg.Content
 	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
 	io.msg = msg
+	io.command = b[0]
+	io.help = b[1]
 
 	return &io
 }
@@ -78,8 +82,11 @@ func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 func sliceToIOdat(b *godbot.Core, s []string) *IOdat {
 	u := b.User
 	var io IOdat
+	var bol [2]bool
 	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
-	io.help, io.io = strToCommands(strings.Join(s, " "))
+	bol, io.io = strToCommands(strings.Join(s, " "))
+	io.command = bol[0]
+	io.help = bol[1]
 
 	return &io
 }
@@ -98,6 +105,11 @@ func idSplit(r rune) bool {
 }
 
 func (io *IOdat) ioHandler() (err error) {
+	if len(io.io) < 1 {
+		// Not enough arguments to do anything.
+		// Prevents accessing nil pointer.
+		return nil
+	}
 	command := io.io[0]
 	switch strings.ToLower(command) {
 	case "roll":
@@ -112,6 +124,8 @@ func (io *IOdat) ioHandler() (err error) {
 		fallthrough
 	case "add", "del", "edit":
 		err = io.dbCore()
+	case "script", "scripts":
+		err = io.scriptCore()
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return

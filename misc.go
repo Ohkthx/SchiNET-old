@@ -14,7 +14,7 @@ import (
 // Error constants for misc functions.
 var (
 	ErrGambleBadAmount = errors.New("bad amount of credits for action")
-	ErrGambleNotMin    = fmt.Errorf("did not provide enough to reach minimum the of %d", GambleMin)
+	ErrGambleNotMin    = fmt.Errorf("did not provide enough to reach the minimum of %d", GambleMin)
 	ErrGambleNotEnough = errors.New("not enough credits")
 )
 
@@ -61,7 +61,7 @@ func (io *IOdat) creditsGamble() error {
 	}
 
 	var all bool
-	var toGamble, spoils int
+	var twealth, toGamble, spoils, mod int
 	var err error
 
 	if strings.ToLower(io.io[1]) == "all" {
@@ -82,44 +82,48 @@ func (io *IOdat) creditsGamble() error {
 		return err
 	}
 
-	if all != true {
+	if all {
+		toGamble = u.Credits
+		twealth = 0
+		spoils = creditsGambleResult(59, 35, 2, toGamble)
+		//spoils -= u.Credits
+	} else {
 		if toGamble > u.Credits {
 			return ErrGambleNotEnough
 		}
+		twealth = u.Credits - toGamble
 		spoils = creditsGambleResult(65, 34, 1, toGamble)
-	} else {
-		toGamble = u.Credits
-		spoils = creditsGambleResult(59, 35, 2, u.Credits)
-		//spoils -= u.Credits
 	}
 
 	var msg string
 	if spoils <= 0 {
-		u.Credits -= toGamble
 		msg = fmt.Sprintf("<@%s> gambled **%d** %s\n"+
 			"Result: **loss**\n"+
 			"%s remaining in bank: **%d**.",
-			io.user.ID, toGamble, GambleCredits, strings.Title(GambleCredits), u.Credits)
-		spoils = -toGamble
+			io.user.ID, toGamble, GambleCredits, strings.Title(GambleCredits), twealth)
+		mod = -toGamble
 		err = userUpdate(io.msg.ChannelID, Bot.User, toGamble)
 		if err != nil {
 			return err
 		}
 	} else {
 		if all {
-			u.Credits = spoils
-			spoils -= toGamble
+			twealth = spoils
+			mod = spoils - u.Credits
 		} else {
-			u.Credits += spoils
+			twealth += spoils
+			mod = spoils - toGamble
 		}
 		msg = fmt.Sprintf("<@%s> gambled **%d** %s\n"+
 			"Result: **Won**    spoils: **%d**\n"+
 			"%s remaining in bank: **%d**.",
-			io.user.ID, toGamble, GambleCredits, spoils, strings.Title(GambleCredits), u.Credits)
-
+			io.user.ID, toGamble, GambleCredits, spoils, strings.Title(GambleCredits), twealth)
 	}
 
-	err = userUpdate(io.msg.ChannelID, io.msg.Author, spoils)
+	// twealth has new player bank amount.
+	// Need to get difference and increment.
+
+	err = userUpdate(io.msg.ChannelID, io.msg.Author, mod)
 	if err != nil {
 		return err
 	}

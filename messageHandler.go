@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 
-	"strings"
-
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/mgo.v2"
 )
@@ -16,12 +14,14 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	var io = msgToIOdat(m)
+
 	if m.Author.Bot {
 		return
 	} else if c.IsPrivate {
 		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
 	} else {
-		if strings.HasPrefix(m.Content, envCMDPrefix) == false {
+		if io.command == false {
 			err = userUpdate(m.ChannelID, m.Author, 1)
 			if err != nil {
 				fmt.Println("updating users credits", err)
@@ -56,7 +56,10 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	var io = msgToIOdat(m)
+	if io.command == false {
+		return
+	}
+
 	err = io.ioHandler()
 	if err != nil {
 		io.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)

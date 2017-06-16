@@ -1,3 +1,7 @@
+0.2.2 - Fixes: 
+            - Gambling properly updating with CORRECT numbers into database.
+            - Message/Input parsing has an added "command" flag if command prefix is found.
+
 0.2.1 - Additions:
             - Channel Locking and Unlocking while processing for updates.
             - Gamble error handling improved.
