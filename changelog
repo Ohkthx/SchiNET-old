@@ -1,3 +1,11 @@
+0.3.0 - Additions:
+            - Script library for hosting scripts or information.
+                Automatically posts information to Pastebin.
+            - Global constants for accessing Pastebin thru go_pastebin.
+            - pasteIt function to handle information to be stored on pastebin.
+        Fixes:
+            - Input processing of commands with quotations.
+
 0.2.2 - Fixes: 
             - Gambling properly updating with CORRECT numbers into database.
             - Message/Input parsing has an added "command" flag if command prefix is found.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/glaxx/go_pastebin"
 )
 
 // Error constants for misc functions.
@@ -228,4 +229,29 @@ func (io *IOdat) creditsPrint() error {
 	io.msgEmbed = userEmbedCreate(u)
 	return nil
 
+}
+
+func pasteIt(msg, title string) (string, error) {
+	p := go_pastebin.NewPastebin(envPBDK)
+	pb, err := p.GenerateUserSession(envPB, envPBPW)
+	if err != nil {
+		return "", err
+	}
+
+	paste, err := pb.Paste("", msg, title, "c", "10M", "1")
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+
+	mod := func(sTr string) string {
+		return strings.Join(strings.Split(sTr, "%20"), " ")
+	}
+
+	ps := mod(paste.String())
+	if strings.Contains(ps, "Post limit") {
+		return "", errors.New(ps)
+	}
+
+	return paste.String(), nil
 }

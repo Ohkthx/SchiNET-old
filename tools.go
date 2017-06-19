@@ -40,6 +40,9 @@ func strToCommands(io string) ([2]bool, []string) {
 		if strings.HasPrefix(w, envCMDPrefix) {
 			w = strings.TrimPrefix(w, envCMDPrefix)
 			res[0] = true
+		} else if strings.HasPrefix(w, "\"") && strings.HasSuffix(w, "\"") {
+			w = strings.TrimPrefix(w, "\"")
+			w = strings.TrimSuffix(w, "\"")
 		} else if strings.HasPrefix(w, "\"") && quoted == false {
 			w = strings.TrimPrefix(w, "\"")
 			quote += w + " "
@@ -49,7 +52,7 @@ func strToCommands(io string) ([2]bool, []string) {
 			quote += w
 			w = quote
 			quoted = false
-
+			quote = ""
 		} else if quoted {
 			quote += w + " "
 		}
@@ -104,12 +107,26 @@ func idSplit(r rune) bool {
 	return r == '<' || r == '@' || r == '>'
 }
 
+func usernameAdd(username, discriminator string) string {
+	return fmt.Sprintf("%s#%s", username, discriminator)
+}
+func usernameSplit(username string) []string {
+	return strings.Split(username, "#")
+
+}
+
 func (io *IOdat) ioHandler() (err error) {
 	if len(io.io) < 1 {
 		// Not enough arguments to do anything.
 		// Prevents accessing nil pointer.
 		return nil
 	}
+
+	if Bot != nil {
+		// Required for storing information in the correct database.
+		io.guild = Bot.GetGuild(Bot.GetChannel(io.msg.ChannelID).GuildID)
+	}
+
 	command := io.io[0]
 	switch strings.ToLower(command) {
 	case "roll":

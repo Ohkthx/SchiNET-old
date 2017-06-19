@@ -25,6 +25,7 @@ const (
 	CollectionBlacklist = "blacklist"
 	CollectionGamble    = "gamble"
 	CollectionConfigs   = "config"
+	CollectionScripts   = "library"
 )
 
 // DBdatCreate creates a database object used to get exchange information with mongodb
@@ -141,10 +142,6 @@ func (d *DBdat) dbGetAll(i interface{}) error {
 }
 
 func (io *IOdat) dbCore() (err error) {
-	if Bot != nil {
-		// Required for storing information in the correct database.
-		io.guild = Bot.GetGuild(Bot.GetChannel(io.msg.ChannelID).GuildID)
-	}
 
 	if len(io.io) > 1 {
 		switch strings.ToLower(io.io[1]) {
@@ -158,7 +155,15 @@ func (io *IOdat) dbCore() (err error) {
 				err = io.miscDelEvent()
 			}
 			return
+		case "script", "scripts":
+			err = io.scriptCore()
 		}
+	}
+
+	if err != nil {
+		return err
+	} else if io.msgEmbed != nil {
+		return nil
 	}
 
 	switch io.io[0] {
@@ -189,6 +194,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var u User
 		bson.Unmarshal(byt, &u)
 		return u, nil
+	case Script:
+		var s Script
+		bson.Unmarshal(byt, &s)
+		return s, nil
 	default:
 		return nil, ErrBadInterface
 	}

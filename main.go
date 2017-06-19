@@ -11,10 +11,13 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version     = "0.2.1"
+	_version     = "0.3.0"
 	envToken     = os.Getenv("BOT_TOKEN")
 	envDBUrl     = os.Getenv("BOT_DBURL")
 	envCMDPrefix = os.Getenv("BOT_PREFIX")
+	envPBDK      = os.Getenv("BOT_PBDevKey")
+	envPBPW      = os.Getenv("BOT_PBPW")
+	envPB        = os.Getenv("BOT_PB")
 )
 
 // Bot Global interface for pulling discord information.
@@ -41,6 +44,13 @@ func main() {
 	err = bot.Start()
 	if err != nil {
 		fmt.Println(err)
+	}
+
+	for _, g := range bot.Guilds {
+		err = bot.SetNickname(g.ID, fmt.Sprintf("(v%s)", _version), true)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	binfo.Core = bot
