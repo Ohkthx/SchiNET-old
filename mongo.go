@@ -55,7 +55,7 @@ type DBHandler struct {
 
 // DBdatCreate creates a database object used to get exchange information with mongodb
 func DBdatCreate(db, coll string, doc interface{}, q bson.M, c bson.M) *DBdat {
-	return &DBdat{Handler: Mgo, Database: db, Collection: coll, Document: doc, Query: q, Change: c}
+	return &DBdat{Handler: Mgo, Database: dbSafe(db), Collection: coll, Document: doc, Query: q, Change: c}
 }
 
 func (d *DBdat) dbInsert() error {
@@ -247,4 +247,9 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 	default:
 		return nil, ErrBadInterface
 	}
+}
+
+func dbSafe(name string) string {
+	t := strings.FieldsFunc(name, idSplit)
+	return strings.Join(t, "_")
 }

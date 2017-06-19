@@ -4,7 +4,6 @@
 + MongoDB Drivers: [go-mgo/mgo](https://github.com/go-mgo/mgo)
 + Pastebin API: [glaxx/go_pastebin](https://github.com/glaxx/go_pastebin)
 + Vita-Nex: Core API: [d0x1p2/vncgo](https://github.com/d0x1p2/vncgo)
-
 + Discord Bot: Core: [d0x1p2/godbot](https://github.com/d0x1p2/godbot)
 + Original: [d0x1p2/DiscordBot-go](https://github.com/d0x1p2/DiscordBot-go)
 
@@ -29,6 +28,8 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + New player greeting.
 + Softbans from channels.
 + Hardbands from server/guild.
++ Last seen to Users
++ Check user existing in Database.
 
 ### Versions
 See [changelog](https://github.com/d0x1p2/usmbot/blob/master/changelog)

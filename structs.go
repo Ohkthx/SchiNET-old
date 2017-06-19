@@ -45,9 +45,10 @@ type Event struct {
 
 // User is a wrapper with additional functionality.
 type User struct {
-	ID            string
+	ID            string `bson:"id"`
 	Username      string
 	Discriminator string
+	Access        int
 	Bot           bool
 	Credits       int
 	CreditsTotal  int

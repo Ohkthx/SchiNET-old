@@ -104,15 +104,15 @@ func tsSplit(r rune) bool {
 }
 
 func idSplit(r rune) bool {
-	return r == '<' || r == '@' || r == '>'
+	return r == '<' || r == '@' || r == '>' || r == ':' || r == ' '
 }
 
 func usernameAdd(username, discriminator string) string {
 	return fmt.Sprintf("%s#%s", username, discriminator)
 }
+
 func usernameSplit(username string) []string {
 	return strings.Split(username, "#")
-
 }
 
 func (io *IOdat) ioHandler() (err error) {
@@ -121,11 +121,6 @@ func (io *IOdat) ioHandler() (err error) {
 		// Not enough arguments to do anything.
 		// Prevents accessing nil pointer.
 		return nil
-	}
-
-	if Bot != nil {
-		// Required for storing information in the correct database.
-		io.guild = Bot.GetGuild(Bot.GetChannel(io.msg.ChannelID).GuildID)
 	}
 
 	command := io.io[0]
@@ -170,9 +165,12 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 	var msgTotal int
 	var dbm = &DBMsg{ID: cID}
 
+	channel := Bot.GetChannel(cID)
+	guild := Bot.GetGuild(channel.GuildID)
+
 	cl, err := Bot.ChannelLockCreate(cID)
 	if err == nil {
-		err = cl.ChannelLock()
+		err = cl.ChannelLock(false)
 		if err != nil {
 			return nil, err
 		}
@@ -180,20 +178,20 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 	}
 
 	for {
-		m, err := s.ChannelMessages(cID, 100, mID, "", "")
+		msgs, err := s.ChannelMessages(cID, 100, mID, "", "")
 		if err != nil {
 			return nil, err
 		}
-		var msgAmt = len(m)
+		var msgAmt = len(msgs)
 		if msgAmt == 0 {
 			return nil, ErrMsgEnding
 		}
-		for n, m := range m {
+		for n, m := range msgs {
 			msgTotal++
 			// Update user here.
-			err = userUpdate(m.ChannelID, m.Author, 1)
+			err = UserUpdateSimple(guild.Name, m.Author, 1)
 			if err != nil {
-				fmt.Println("updating users credits", err)
+				fmt.Println(err)
 			}
 
 			if dbm.MIDr == "" {
@@ -212,7 +210,7 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 			} else {
 				mID = m.ID
 			}
-			fmt.Printf("\r%7d messages processed.", msgTotal)
+			//fmt.Printf("\r%s -> %7d messages processed.", cID, msgTotal)
 		}
 	}
 }
@@ -226,9 +224,12 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 	var msgTotal int
 	var mID = dbm.MIDr
 
+	channel := Bot.GetChannel(dbm.ID)
+	guild := Bot.GetGuild(channel.GuildID)
+
 	cl, err := Bot.ChannelLockCreate(dbm.ID)
 	if err == nil {
-		err = cl.ChannelLock()
+		err = cl.ChannelLock(false)
 		if err != nil {
 			return nil, err
 		}
@@ -254,9 +255,9 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 			dbm.MTotal++
 			msgTotal++
 			// Update users credits.
-			err = userUpdate(m.ChannelID, m.Author, 1)
+			err = UserUpdateSimple(guild.Name, m.Author, 1)
 			if err != nil {
-				fmt.Println("updating users credits", err)
+				fmt.Println(err)
 			}
 			// Break at Ending Message.
 			if msgAmt < 100 && msgAmt == n+1 {
@@ -264,14 +265,14 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 			}
 
 			mID = m.ID
-			fmt.Printf("\r%7d messages processed.", msgTotal)
+			//fmt.Printf("\r%7d messages processed.", msgTotal)
 		}
 	}
 }
 
 func messagesProcessStartup() error {
 
-	for n, c := range Bot.Channels {
+	for _, c := range Bot.Channels {
 		if c.Type != "text" {
 			continue
 		}
@@ -288,7 +289,7 @@ func messagesProcessStartup() error {
 			lastID = dbmsg.MIDr
 		}
 
-		fmt.Printf("\n[%d] Processing [%s]", n, c.ID)
+		//fmt.Printf("\n[%d] Processing [%s]", n, c.ID)
 
 		if lastID == "" {
 			dbm, err = messagesToPast(c.ID, lastID, "")
@@ -307,7 +308,7 @@ func messagesProcessStartup() error {
 				}
 			}
 		}
-		fmt.Printf("\r[%d] Processed  [%s]", n, c.ID)
+		//fmt.Printf("\r[%d] Processed  [%s]", n, c.ID)
 
 		// Update Database with last processed message.
 		if dbm != nil {
@@ -370,71 +371,6 @@ func messagesGet(cID string) (*DBMsg, error) {
 
 	var u DBMsg
 	u = dbdat.Document.(DBMsg)
-
-	return &u, nil
-}
-
-func userUpdate(cID string, us *discordgo.User, spoils int) error {
-	var q = make(map[string]interface{})
-	var c = make(map[string]interface{})
-
-	gID, err := Bot.GetGuildID(cID)
-	if err != nil {
-		return err
-	}
-	g := Bot.GetGuild(gID)
-
-	var totalInc = 1
-	if spoils != 1 {
-		totalInc = 0
-	}
-
-	var u = User{
-		ID:            us.ID,
-		Username:      us.Username,
-		Discriminator: us.Discriminator,
-		Bot:           us.Bot,
-		CreditsTotal:  1,
-		Credits:       1,
-	}
-
-	q["id"] = u.ID
-	c["$inc"] = bson.M{"creditstotal": totalInc, "credits": spoils}
-	var dbdat = DBdatCreate(g.Name, CollectionUsers, u, q, c)
-
-	err = dbdat.dbEdit(User{})
-	if err != nil {
-		if err != mgo.ErrNotFound {
-			return err
-		}
-		// Add to DB since it doesn't exist.
-		err = dbdat.dbInsert()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func userGet(cID, uID string) (*User, error) {
-	var q = make(map[string]interface{})
-
-	gID, err := Bot.GetGuildID(cID)
-	if err != nil {
-		return nil, err
-	}
-	g := Bot.GetGuild(gID)
-
-	q["id"] = uID
-	var dbdat = DBdatCreate(g.Name, CollectionUsers, User{}, q, nil)
-	err = dbdat.dbGet(User{})
-	if err != nil {
-		return nil, err
-	}
-
-	var u User
-	u = dbdat.Document.(User)
 
 	return &u, nil
 }

@@ -11,7 +11,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version     = "0.3.2"
+	_version     = "0.3.3"
 	envToken     = os.Getenv("BOT_TOKEN")
 	envDBUrl     = os.Getenv("BOT_DBURL")
 	envCMDPrefix = os.Getenv("BOT_PREFIX")

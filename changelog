@@ -1,3 +1,11 @@
+0.3.3 - Additions:
+            - Permissions on user accounts.
+        Fixes:
+            - Reorganized functions that act on User{} struct.
+            - Minor efficiency changes to getting Guilds/Channels while message processing.
+            - Gamble win/loss ratio increased to be more "fair."
+            - dbSafe() does some sanitation on database names prior to storing.
+
 0.3.2 - Additions:
             - Deleting from Database in mongo.
             - Deleting scripts.

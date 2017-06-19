@@ -9,12 +9,18 @@ import (
 
 func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var err error
-	c, err := s.Channel(m.ChannelID)
-	if err != nil {
+	var c *discordgo.Channel
+	if c, err = s.Channel(m.ChannelID); err != nil {
+		fmt.Println(err)
 		return
 	}
 
 	var io = msgToIOdat(m)
+
+	if Bot != nil {
+		// Required for storing information in the correct database.
+		io.guild = Bot.GetGuild(c.GuildID)
+	}
 
 	if m.Author.Bot {
 		return
@@ -22,7 +28,7 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
 	} else {
 		if io.command == false {
-			err = userUpdate(m.ChannelID, m.Author, 1)
+			err = UserUpdateSimple(io.guild.Name, m.Author, 1)
 			if err != nil {
 				fmt.Println("updating users credits", err)
 			}
