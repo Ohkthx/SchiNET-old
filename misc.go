@@ -101,7 +101,8 @@ func (io *IOdat) creditsGamble() error {
 			"%s remaining in bank: **%d**.",
 			io.user.ID, toGamble, GambleCredits, strings.Title(GambleCredits), twealth)
 		//mod = -toGamble
-		err = UserUpdateSimple(io.guild.Name, Bot.User, toGamble)
+		bu := UserNew(Bot.User)
+		err = bu.Update(io.guild.Name)
 		if err != nil {
 			return err
 		}
@@ -226,7 +227,7 @@ func (io *IOdat) creditsPrint() error {
 		return err
 	}
 
-	io.msgEmbed = userEmbedCreate(u)
+	io.msgEmbed = u.EmbedCreate()
 	return nil
 
 }

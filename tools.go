@@ -189,7 +189,8 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 		for n, m := range msgs {
 			msgTotal++
 			// Update user here.
-			err = UserUpdateSimple(guild.Name, m.Author, 1)
+			ts, _ := m.Timestamp.Parse()
+			err = UserUpdateSimple(guild.Name, m.Author, 1, ts)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -255,7 +256,8 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 			dbm.MTotal++
 			msgTotal++
 			// Update users credits.
-			err = UserUpdateSimple(guild.Name, m.Author, 1)
+			ts, _ := m.Timestamp.Parse()
+			err = UserUpdateSimple(guild.Name, m.Author, 1, ts)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -373,21 +375,4 @@ func messagesGet(cID string) (*DBMsg, error) {
 	u = dbdat.Document.(DBMsg)
 
 	return &u, nil
-}
-
-func userEmbedCreate(u *User) *discordgo.MessageEmbed {
-	description := fmt.Sprintf(
-		"__ID: %s__\n"+
-			"**Username**:   %-18s **%s**: %-10d\n"+
-			"**Reputation**: %d",
-		u.ID,
-		fmt.Sprintf("%s#%s", u.Username, u.Discriminator), strings.Title(GambleCredits), u.Credits,
-		u.CreditsTotal)
-
-	return &discordgo.MessageEmbed{
-		Author:      &discordgo.MessageEmbedAuthor{},
-		Color:       ColorBlue,
-		Description: description,
-		Fields:      []*discordgo.MessageEmbedField{},
-	}
 }

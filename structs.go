@@ -52,6 +52,7 @@ type User struct {
 	Bot           bool
 	Credits       int
 	CreditsTotal  int
+	LastSeen      time.Time `bson:"lastseen"`
 }
 
 // Command structure for User Defined commands.

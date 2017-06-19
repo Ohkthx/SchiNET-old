@@ -2,6 +2,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -56,7 +59,7 @@ func UserNew(u *discordgo.User) *User {
 }
 
 // UserUpdateSimple stream-lines the process for incrementing credits.
-func UserUpdateSimple(database string, user *discordgo.User, inc int) error {
+func UserUpdateSimple(database string, user *discordgo.User, inc int, ts time.Time) error {
 	u := UserNew(user)
 
 	if err := u.Get(database, u.ID); err != nil {
@@ -72,6 +75,7 @@ func UserUpdateSimple(database string, user *discordgo.User, inc int) error {
 	if inc == 1 {
 		u.CreditsTotal++
 		u.Credits++
+		u.LastSeen = ts
 	} else {
 		u.Credits += inc
 	}
@@ -100,7 +104,11 @@ func (u *User) Update(database string) error {
 	var c = make(map[string]interface{})
 
 	q["id"] = u.ID
-	c["$set"] = bson.M{"creditstotal": u.CreditsTotal, "credits": u.Credits, "access": u.Access}
+	c["$set"] = bson.M{
+		"creditstotal": u.CreditsTotal,
+		"credits":      u.Credits,
+		"access":       u.Access,
+		"lastseen":     u.LastSeen}
 
 	var dbdat = DBdatCreate(database, CollectionUsers, u, q, c)
 	err = dbdat.dbEdit(User{})
@@ -139,6 +147,32 @@ func (u *User) Get(database, uID string) error {
 	u.Credits = user.Credits
 	u.CreditsTotal = user.CreditsTotal
 	u.Access = user.Access
+	u.LastSeen = user.LastSeen
 
 	return nil
+}
+
+// EmbedCreate returns an embed object with User information.
+func (u *User) EmbedCreate() *discordgo.MessageEmbed {
+	tn := time.Now()
+	dur := tn.Sub(u.LastSeen)
+
+	ta := fmt.Sprintf("**%d** hours, **%d** minutes.", int(dur.Hours()), int(dur.Minutes())%60)
+
+	description := fmt.Sprintf(
+		"__ID: %s__\n"+
+			"**Username**:   %-18s **%s**: %-10d\n"+
+			"**Reputation**: %d\n\n"+
+			"**Last Seen**: %s",
+		u.ID,
+		fmt.Sprintf("%s#%s", u.Username, u.Discriminator), strings.Title(GambleCredits), u.Credits,
+		u.CreditsTotal,
+		ta)
+
+	return &discordgo.MessageEmbed{
+		Author:      &discordgo.MessageEmbedAuthor{},
+		Color:       ColorBlue,
+		Description: description,
+		Fields:      []*discordgo.MessageEmbedField{},
+	}
 }

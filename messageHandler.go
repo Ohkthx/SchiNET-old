@@ -28,7 +28,8 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
 	} else {
 		if io.command == false {
-			err = UserUpdateSimple(io.guild.Name, m.Author, 1)
+			ts, _ := m.Timestamp.Parse()
+			err = UserUpdateSimple(io.guild.Name, m.Author, 1, ts)
 			if err != nil {
 				fmt.Println("updating users credits", err)
 			}
