@@ -25,6 +25,10 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + Event Timers and Tracking
 + ~~Message Count Gambling~~
 + Move ENV variables to CFG/INI file.
++ Event Handlers for creating/deleting channels
++ New player greeting.
++ Softbans from channels.
++ Hardbands from server/guild.
 
 ### Versions
 See [changelog](https://github.com/d0x1p2/usmbot/blob/master/changelog)

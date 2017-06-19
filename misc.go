@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/glaxx/go_pastebin"
+	"github.com/d0x1p2/go_pastebin"
 )
 
 // Error constants for misc functions.
@@ -238,19 +238,10 @@ func pasteIt(msg, title string) (string, error) {
 		return "", err
 	}
 
-	paste, err := pb.Paste("", msg, title, "c", "10M", "1")
+	paste, err := pb.Paste(msg, title, "c", "10M", "1")
 	if err != nil {
 		fmt.Println(err)
 		return "", err
-	}
-
-	mod := func(sTr string) string {
-		return strings.Join(strings.Split(sTr, "%20"), " ")
-	}
-
-	ps := mod(paste.String())
-	if strings.Contains(ps, "Post limit") {
-		return "", errors.New(ps)
 	}
 
 	return paste.String(), nil

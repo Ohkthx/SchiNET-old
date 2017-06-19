@@ -1,3 +1,22 @@
+0.3.2 - Additions:
+            - Deleting from Database in mongo.
+            - Deleting scripts.
+            - Script Help added.
+            - Script printing implemented.
+            - Using d0x1p2/go_pastebin until PR complete.
+        Fixes:
+            - dbDelete -> dbDeleteID to make room for new delete based on query.
+            - Script parsing using more flags.
+            - Database structures moved to mongo.go
+
+0.3.1 - Additions:
+            - Script command parsing. -u and -s flags.
+            - Script requesting function (scriptRequest)
+        Fixes:
+            - Rearranged script functions so they are in a more correct order.
+            - Small fixes for script editing to reflect changes to database.
+            - Forked go_pastebin, made changes- placed pull request. Local changes applied.
+
 0.3.0 - Additions:
             - Script library for hosting scripts or information.
                 Automatically posts information to Pastebin.

@@ -116,6 +116,7 @@ func usernameSplit(username string) []string {
 }
 
 func (io *IOdat) ioHandler() (err error) {
+	var s string
 	if len(io.io) < 1 {
 		// Not enough arguments to do anything.
 		// Prevents accessing nil pointer.
@@ -142,7 +143,8 @@ func (io *IOdat) ioHandler() (err error) {
 	case "add", "del", "edit":
 		err = io.dbCore()
 	case "script", "scripts":
-		err = io.scriptCore()
+		s, err = scriptCore(io.guild.Name, io.msg.Author, io.io, io.help)
+		io.msgEmbed = embedCreator(s, ColorGreen)
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return

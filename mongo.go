@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"gopkg.in/mgo.v2"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -27,6 +27,31 @@ const (
 	CollectionConfigs   = "config"
 	CollectionScripts   = "library"
 )
+
+// DBdat passes information as to what to store into a database.
+type DBdat struct {
+	Handler    *mgo.Session
+	Database   string
+	Collection string
+	Document   interface{}
+	Documents  []interface{}
+	Query      bson.M
+	Change     bson.M
+}
+
+// DBMsg stores information on messages last processed.
+type DBMsg struct {
+	ID      string
+	MTotal  int
+	MIDr    string // Message ID of most recent.
+	MIDf    string // Message ID of first message.
+	Content string
+}
+
+//DBHandler Stores a MongoDB connection.
+type DBHandler struct {
+	*mgo.Session
+}
 
 // DBdatCreate creates a database object used to get exchange information with mongodb
 func DBdatCreate(db, coll string, doc interface{}, q bson.M, c bson.M) *DBdat {
@@ -76,7 +101,7 @@ func (d *DBdat) dbEdit(i interface{}) error {
 	return nil
 }
 
-func (d *DBdat) dbDelete(id bson.ObjectId) error {
+func (d *DBdat) dbDeleteID(id bson.ObjectId) error {
 	var err error
 
 	mdb := d.Handler
@@ -85,6 +110,26 @@ func (d *DBdat) dbDelete(id bson.ObjectId) error {
 
 	c := mdb.DB(d.Database).C(d.Collection)
 	err = c.RemoveId(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *DBdat) dbDelete() error {
+	var err error
+
+	if d.Query == nil {
+		return ErrNilQuery
+	}
+
+	mdb := d.Handler
+
+	//mdb.SetMode(mgo.Monotonic, true)
+
+	c := mdb.DB(d.Database).C(d.Collection)
+	err = c.Remove(d.Query)
 	if err != nil {
 		return err
 	}
@@ -142,7 +187,7 @@ func (d *DBdat) dbGetAll(i interface{}) error {
 }
 
 func (io *IOdat) dbCore() (err error) {
-
+	var s string
 	if len(io.io) > 1 {
 		switch strings.ToLower(io.io[1]) {
 		case "event", "events":
@@ -156,7 +201,8 @@ func (io *IOdat) dbCore() (err error) {
 			}
 			return
 		case "script", "scripts":
-			err = io.scriptCore()
+			s, err = scriptCore(io.guild.Name, io.msg.Author, io.io, io.help)
+			io.msgEmbed = embedCreator(s, ColorGreen)
 		}
 	}
 

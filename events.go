@@ -90,7 +90,7 @@ func (io *IOdat) miscDelEvent() error {
 	}
 
 	var ev = dbdat.Document.(Event)
-	err = dbdat.dbDelete(ev.ID)
+	err = dbdat.dbDeleteID(ev.ID)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (io *IOdat) miscGetEvents() error {
 
 		} else if hours < -12 {
 			// Delete from Database here.
-			err := dbdat.dbDelete(ev.ID)
+			err := dbdat.dbDeleteID(ev.ID)
 			if err != nil {
 				return err
 			}
