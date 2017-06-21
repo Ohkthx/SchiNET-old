@@ -10,18 +10,18 @@ import (
 
 // Error constants for database issues.
 var (
-	ErrNilInterface = errors.New("nil interface provided")
-	ErrNilQuery     = errors.New("nil interface provided")
-	ErrNilChange    = errors.New("nil change provided")
-	ErrUnknownType  = errors.New("unknown type")
-	ErrBadInterface = errors.New("bad interface, unknown in switch")
+	ErrNilInterface    = errors.New("nil interface provided")
+	ErrNilQuery        = errors.New("nil interface provided")
+	ErrNilChange       = errors.New("nil change provided")
+	ErrUnknownType     = errors.New("unknown type")
+	ErrBadInterface    = errors.New("bad interface, unknown in switch")
+	CollectionMessages = func(c string) string { return "messages." + c }
 )
 
 // Collection constants
 const (
 	CollectionEvents    = "events"
 	CollectionUsers     = "users"
-	CollectionMessages  = "messages"
 	CollectionBlacklist = "blacklist"
 	CollectionGamble    = "gamble"
 	CollectionConfigs   = "config"

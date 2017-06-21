@@ -192,6 +192,9 @@ func messagesToPast(cID, mID, emID string) (*DBMsg, error) {
 		}
 		for n, m := range msgs {
 			msgTotal++
+			if err := messageLog(guild.Name, channel.Name, m); err != nil {
+				fmt.Println("err while adding message", err)
+			}
 			// Update user here.
 			ts, _ := m.Timestamp.Parse()
 			err = UserUpdateSimple(guild.Name, m.Author, 1, ts)
@@ -259,6 +262,9 @@ func messagesToPresent(dbm *DBMsg) (*DBMsg, error) {
 			}
 			dbm.MTotal++
 			msgTotal++
+			if err := messageLog(guild.Name, channel.Name, m); err != nil {
+				fmt.Println("err while adding message", err)
+			}
 			// Update users credits.
 			ts, _ := m.Timestamp.Parse()
 			err = UserUpdateSimple(guild.Name, m.Author, 1, ts)

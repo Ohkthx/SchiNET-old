@@ -1,3 +1,11 @@
+0.4.1 - Additions:
+            - Message arching of all messages with messageLog().
+            - Ability to reset players credits.
+        Fixes:
+            - Gambling win/loss tweaked.
+            - Bot will not collect credits from a loss.... correctly.
+            - ANTI-THEFT SYSTEM IN PLACE! for ,xfer
+
 0.4.0 - Additions:
             - Player banning, both soft (from channel) and hard (from guild)
             - Beginning work on Config struct, will be used by handlers.

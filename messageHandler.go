@@ -38,6 +38,12 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
 	} else {
+		// Log message into Database
+		if err := messageLog(io.guild.Name, c.Name, m.Message); err != nil {
+			fmt.Println(err)
+		}
+		// End logging message
+
 		if io.command == false {
 			ts, _ := m.Timestamp.Parse()
 			err = UserUpdateSimple(io.guild.Name, m.Author, 1, ts)
@@ -105,4 +111,12 @@ func newUserHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
 		msg := fmt.Sprintf("Welcome to the server, <@%s>!", nu.User.ID)
 		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
 	}
+}
+
+func messageLog(database, channel string, m *discordgo.Message) error {
+	db := DBdatCreate(database, CollectionMessages(channel), m, nil, nil)
+	if err := db.dbInsert(); err != nil {
+		return err
+	}
+	return nil
 }

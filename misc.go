@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/go_pastebin"
 )
 
@@ -88,13 +89,13 @@ func (io *IOdat) creditsGamble() error {
 		}
 		toGamble = u.Credits
 		twealth = 0
-		spoils = creditsGambleResult(58, 40, 2, toGamble)
+		spoils = creditsGambleResult(57, 41, 2, toGamble)
 	} else {
 		if toGamble > u.Credits {
 			return ErrGambleNotEnough
 		}
 		twealth = u.Credits - toGamble
-		spoils = creditsGambleResult(60, 38, 2, toGamble)
+		spoils = creditsGambleResult(59, 39, 2, toGamble)
 	}
 
 	var msg string
@@ -104,6 +105,7 @@ func (io *IOdat) creditsGamble() error {
 			"%s remaining in bank: **%d**.",
 			io.user.ID, toGamble, GambleCredits, strings.Title(GambleCredits), twealth)
 		bu := UserNew(Bot.User)
+		bu.Get(io.guild.Name, bu.ID)
 		bu.Credits += toGamble
 		err = bu.Update(io.guild.Name)
 		if err != nil {
@@ -171,6 +173,16 @@ func (io *IOdat) creditsTransfer() error {
 	s := strings.FieldsFunc(io.io[1], idSplit)
 	u2ID := s[0]
 
+	if amt < 0 {
+		msg := "The authorities have been alerted with your attempt of theft!"
+		io.msgEmbed = embedCreator(msg, ColorMaroon)
+		return nil
+	} else if amt == 0 {
+		msg := "What do you plan accomplishing with this?"
+		io.msgEmbed = embedCreator(msg, ColorMaroon)
+		return nil
+	}
+
 	u1 := UserNew(io.msg.Author)
 	if err := u1.Get(database, io.user.ID); err != nil {
 		return err
@@ -210,13 +222,21 @@ func (io *IOdat) creditsTransfer() error {
 }
 
 func (io *IOdat) creditsPrint() error {
+	var msg string
+	var err error
 	if len(io.io) < 2 {
 		return ErrBadArgs
 	} else if len(io.io) == 3 && strings.ToLower(io.io[0]) == "xfer" {
-		err := io.creditsTransfer()
+		err = io.creditsTransfer()
 		if err != nil {
 			return err
 		}
+		return nil
+	} else if strings.Contains(io.io[1], "reset") {
+		if msg, err = creditsReset(io.guild.Name, io.msg.Author); err != nil {
+			return err
+		}
+		io.msgEmbed = embedCreator(msg, ColorGreen)
 		return nil
 	}
 
@@ -231,6 +251,47 @@ func (io *IOdat) creditsPrint() error {
 	io.msgEmbed = u.EmbedCreate()
 	return nil
 
+}
+
+func creditsReset(database string, dgu *discordgo.User) (string, error) {
+	var msg = "Users reset:\n\n"
+	uID := dgu.ID
+	user := UserNew(dgu)
+	if err := user.Get(database, uID); err != nil {
+		return "", err
+	}
+
+	if ok := user.HasPermission(permAll); !ok {
+		return "", ErrBadPermissions
+	}
+
+	db := DBdatCreate(database, CollectionUsers, User{}, nil, nil)
+	if err := db.dbGetAll(User{}); err != nil {
+		return "", err
+	}
+
+	if len(db.Documents) == 0 {
+		return "", nil
+	}
+
+	var found bool
+	var doc User
+	for _, u := range db.Documents {
+		doc = u.(User)
+		if doc.Credits != doc.CreditsTotal {
+			found = true
+			msg += fmt.Sprintf("\t__**%s**#%s__: %d -> %d\n",
+				doc.Username, doc.Discriminator, doc.Credits, doc.CreditsTotal)
+			doc.Credits = doc.CreditsTotal
+			if err := doc.Update(database); err != nil {
+				return "", err
+			}
+		}
+	}
+	if !found {
+		msg = "No users updated."
+	}
+	return msg, nil
 }
 
 func pasteIt(msg, title string) (string, error) {
