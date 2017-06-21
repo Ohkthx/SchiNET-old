@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"time"
@@ -10,6 +11,12 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
 )
+
+// Config holds information that needs to be readily accessible.
+type Config struct {
+	Core *godbot.Core
+	DB   *mgo.Session
+}
 
 // Bot is a wrapper for the godbot.Core
 type bot struct {

@@ -175,8 +175,8 @@ func (u *User) EmbedCreate() *discordgo.MessageEmbed {
 
 // Ban will remove a player from the server
 func (u *User) Ban(database, cID string, io []string) (string, error) {
-	var msg, idp, id, comment string        // Message to send and IDs
-	var soft, hard, remove, list, help bool // Types of ban.
+	var msg, idp, id, comment string             // Message to send and IDs
+	var soft, hard, remove, list, bot, help bool // Types of ban.
 	var err error
 
 	fl := flag.NewFlagSet("ban", flag.ContinueOnError)
@@ -184,6 +184,7 @@ func (u *User) Ban(database, cID string, io []string) (string, error) {
 	fl.StringVar(&comment, "c", "", "Ban Comment")
 	fl.BoolVar(&soft, "soft", false, "Type: Soft Ban")
 	fl.BoolVar(&hard, "hard", false, "Type: Hard Ban")
+	fl.BoolVar(&bot, "bot", false, "Type: Bot")
 	fl.BoolVar(&help, "help", false, "This message")
 	fl.BoolVar(&remove, "remove", false, "Remove a type of ban")
 	fl.BoolVar(&list, "list", false, "List all bans.")
@@ -194,6 +195,10 @@ func (u *User) Ban(database, cID string, io []string) (string, error) {
 	if idp != "" {
 		ids := strings.FieldsFunc(idp, idSplit)
 		id = ids[0]
+	}
+
+	if u.ID == id {
+		return fmt.Sprintf("Oh c'mon <@%s>m that would just be silly...", u.ID), nil
 	}
 
 	if err = u.Get(database, u.ID); err != nil {
@@ -229,6 +234,34 @@ func (u *User) Ban(database, cID string, io []string) (string, error) {
 				return "", err
 			}
 		}
+	} else if bot && id != "" {
+		criminal := UserNew(nil)
+		if err = criminal.Get(database, id); err != nil {
+			return "", err
+		}
+
+		msg = fmt.Sprintf("Bot access has been __**revoked**__ for <@%s>.", criminal.ID)
+		criminal.Access = 0
+		if remove {
+			criminal.Access |= permNormal
+			msg = fmt.Sprintf("Bot access has been __**restored**__ for <@%s>.", criminal.ID)
+		} else {
+			var b = criminal.BanNew()
+			if err := b.Get(database); err != nil {
+				if err != mgo.ErrNotFound {
+					return "", err
+				}
+			}
+			b.Amount++
+			if err := b.Update(database); err != nil {
+				return "", err
+			}
+		}
+		if err := criminal.Update(database); err != nil {
+			return "", err
+		}
+		return msg, nil
+
 	} else {
 		prefix := "**Need** __type__ and __username__.\n\n"
 		return Help(fl, prefix), nil
@@ -436,11 +469,23 @@ func banList(database string) (string, error) {
 	var b Ban
 	var found bool
 	for _, criminal := range db.Documents {
+		var botban bool
 		b = criminal.(Ban)
-		if len(b.Channels) > 0 {
+		u := UserNew(nil)
+		if err := u.Get(database, b.User.ID); err != nil {
+			fmt.Println("Could not get user while getting ban list", err.Error())
+		}
+		if u.Access&permNormal != permNormal {
+			botban = true
+		}
+
+		if len(b.Channels) > 0 || botban {
+			found = true
 			msg += fmt.Sprintf("\t**__%s#%s__**\n", b.User.Name, b.User.Discriminator)
+			if botban {
+				msg += "\t\t**Bot Banned.**\n"
+			}
 			for _, c := range b.Channels {
-				found = true
 				msg += fmt.Sprintf("\t\tChannel: **%s**, Comment: **%s**\n", c.Name, c.Comment)
 			}
 		}

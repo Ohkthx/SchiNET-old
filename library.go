@@ -323,9 +323,14 @@ func (lib *Library) List() (string, error) {
 		docs = append(docs, doc)
 	}
 
-	var msg = "Current Scripts in Library:\n"
+	var found bool
+	var msg = "Current Scripts in Library:\n\n"
 	for n, d := range docs {
+		found = true
 		msg += fmt.Sprintf("  [%d] %s -> %s\n", n, d.Author.Username, d.Name)
+	}
+	if !found {
+		msg += "No scripts found in library.\n"
 	}
 	msg += fmt.Sprintf("\nTo request a script, type:\n%s", scriptSyntaxGet)
 

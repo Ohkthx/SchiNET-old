@@ -1,3 +1,10 @@
+0.4.2 - Additions:
+            - Moving Bot&Mgo globals to Config{}.
+            - Banning from Bot usage with `,ban -bot`
+        Fixes:
+            - Library properly reporting if there are no found scripts in output.
+            - Preventitive measure from banning yourself.
+
 0.4.1 - Additions:
             - Message arching of all messages with messageLog().
             - Ability to reset players credits.

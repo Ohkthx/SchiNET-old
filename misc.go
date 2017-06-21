@@ -177,8 +177,8 @@ func (io *IOdat) creditsTransfer() error {
 		msg := "The authorities have been alerted with your attempt of theft!"
 		io.msgEmbed = embedCreator(msg, ColorMaroon)
 		return nil
-	} else if amt == 0 {
-		msg := "What do you plan accomplishing with this?"
+	} else if amt == 0 || u2ID == io.user.ID {
+		msg := "What do you plan on accomplishing with this?"
 		io.msgEmbed = embedCreator(msg, ColorMaroon)
 		return nil
 	}

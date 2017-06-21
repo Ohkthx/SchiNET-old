@@ -11,7 +11,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version     = "0.4.1"
+	_version     = "0.4.2"
 	envToken     = os.Getenv("BOT_TOKEN")
 	envDBUrl     = os.Getenv("BOT_DBURL")
 	envCMDPrefix = os.Getenv("BOT_PREFIX")
@@ -19,12 +19,6 @@ var (
 	envPBPW      = os.Getenv("BOT_PBPW")
 	envPB        = os.Getenv("BOT_PB")
 )
-
-// Config is a Global config
-var Config struct {
-	Core *godbot.Core
-	Mgo  *mgo.Session
-}
 
 // Bot Global interface for pulling discord information.
 var Bot *godbot.Core
@@ -35,6 +29,7 @@ var Mgo *mgo.Session
 func main() {
 
 	var binfo bot
+	var cfg = &Config{}
 
 	if envToken == "" {
 		return
@@ -62,24 +57,29 @@ func main() {
 
 	binfo.Core = bot
 	Bot = bot
-	Mgo, err = mgo.Dial(envDBUrl)
+
+	cfg.Core = bot
+	cfg.DB, err = mgo.Dial(envDBUrl)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = messagesProcessStartup()
-	if err != nil {
-		fmt.Println("messageProcessStartup()", err)
-		return
-	}
+	Mgo = cfg.DB
 
-	binfo.core()
+	/*
+		err = messagesProcessStartup()
+		if err != nil {
+			fmt.Println("messageProcessStartup()", err)
+			return
+		}
+	*/
+	cfg.core()
 }
 
-func (b *bot) cleanup() {
-	b.Stop()
-	Mgo.Close()
+func (cfg *Config) cleanup() {
+	cfg.Core.Stop()
+	cfg.DB.Close()
 	fmt.Println("Bot stopped, exiting.")
 	os.Exit(0)
 }

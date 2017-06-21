@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/bwmarrin/discordgo"
+
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -248,6 +250,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var b Ban
 		bson.Unmarshal(byt, &b)
 		return b, nil
+	case discordgo.Message:
+		var m discordgo.Message
+		bson.Unmarshal(byt, &m)
+		return m, nil
 	default:
 		return nil, ErrBadInterface
 	}
