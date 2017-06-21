@@ -16,6 +16,7 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + Gambling support, based on message count.
 + Script library.
 + Pastebin posting via API.
++ Player Soft/Hard bans.
 
 ### TODO/Reimplement List
 + Support for Vita-Nex: Core API
@@ -24,12 +25,13 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + Event Timers and Tracking
 + ~~Message Count Gambling~~
 + Move ENV variables to CFG/INI file.
-+ Event Handlers for creating/deleting channels
-+ New player greeting.
-+ Softbans from channels.
-+ Hardbands from server/guild.
-+ Last seen to Users
-+ Check user existing in Database.
++ ~~Event Handlers for creating/deleting channels~~
++ ~~New player greeting.~~
++ ~~Softbans from channels.~~
++ ~~Hardbands from server/guild.~~
++ ~~Last seen to Users~~
++ ~~Check user existing in Database.~~
++ Parsing in-game messages and sending to discord.
 
 ### Versions
 See [changelog](https://github.com/d0x1p2/usmbot/blob/master/changelog)

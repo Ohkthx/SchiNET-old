@@ -11,7 +11,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version     = "0.3.3"
+	_version     = "0.3.4"
 	envToken     = os.Getenv("BOT_TOKEN")
 	envDBUrl     = os.Getenv("BOT_DBURL")
 	envCMDPrefix = os.Getenv("BOT_PREFIX")
@@ -19,6 +19,12 @@ var (
 	envPBPW      = os.Getenv("BOT_PBPW")
 	envPB        = os.Getenv("BOT_PB")
 )
+
+// Config is a Global config
+var Config struct {
+	Core *godbot.Core
+	Mgo  *mgo.Session
+}
 
 // Bot Global interface for pulling discord information.
 var Bot *godbot.Core
@@ -41,6 +47,7 @@ func main() {
 	}
 
 	bot.MessageHandler(msghandler)
+	bot.NewUserHandler(newUserHandler)
 	err = bot.Start()
 	if err != nil {
 		fmt.Println(err)

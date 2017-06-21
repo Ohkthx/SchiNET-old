@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/mgo.v2"
@@ -23,8 +24,18 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if m.Author.Bot {
+		if m.Author.ID == Bot.User.ID {
+			ts, _ := m.Timestamp.Parse()
+			if err := UserUpdateSimple(io.guild.Name, m.Author, 1, ts); err != nil {
+				return
+			}
+		}
 		return
 	} else if c.IsPrivate {
+		if strings.Contains(m.Content, ",list") {
+			s.ChannelMessageSend(c.ID, channelsTemp())
+		}
+		return
 		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
 	} else {
 		if io.command == false {
@@ -86,4 +97,12 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	return
+}
+
+func newUserHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
+	if Bot != nil {
+		c := Bot.GetMainChannel(nu.GuildID)
+		msg := fmt.Sprintf("Welcome to the server, <@%s>!", nu.User.ID)
+		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
+	}
 }

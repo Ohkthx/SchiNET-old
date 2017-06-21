@@ -91,7 +91,7 @@ func scriptCore(server string, user *discordgo.User, io []string, help bool) (st
 	case lib.ArgHelp:
 		fallthrough
 	default:
-		msg = lib.Help()
+		msg = Help(lib.Flags, "")
 	}
 
 	if err != nil {
@@ -291,31 +291,6 @@ func (lib *Library) find(requested bool) (*Script, error) {
 	}
 
 	return lib.Script, nil
-}
-
-// Help prints help information for accessing script library.
-func (lib *Library) Help() string {
-	f := lib.Flags
-	var s string
-
-	f.VisitAll(func(fflag *flag.Flag) {
-		s += fmt.Sprintf("  -%s", fflag.Name) // Two spaces before -; see next two comments.
-		name, usage := flag.UnquoteUsage(fflag)
-		if len(name) > 0 {
-			s += " " + name
-		}
-		// Boolean flags of one ASCII letter are so common we
-		// treat them specially, putting their usage on the same line.
-		if len(s) <= 4 { // space, space, '-', 'x'.
-			s += "\t"
-		} else {
-			// Four spaces before the tab triggers good alignment
-			// for both 4- and 8-space tab stops.
-			s += "\n    \t"
-		}
-		s += usage + "\n"
-	})
-	return s
 }
 
 // Get gets a script from the database/library.

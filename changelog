@@ -1,6 +1,21 @@
+0.4.0 - Additions:
+            - Player banning, both soft (from channel) and hard (from guild)
+            - Beginning work on Config struct, will be used by handlers.
+            - Handler for players joining guild. Used as greets as of current.
+            - Timestamps in Database for messages are generated from discord message.
+            - README.md updates with current project status.
+            - Ban Structs -> Ban{}, chanBan{}, and UserBasic{}
+        Fixes:
+            - Help() will now return ANY type of help for arguments.
+            - Gamble fixes, minimum bet set for ,gamble all. -> GambleMin/2
+            - Losing to the House (Bot) now increments bots credits correctly.
+
+
 0.3.3 - Additions:
             - Permissions on user accounts.
+            - Timestamps as to when the user was last seen.
         Fixes:
+            - userEmbedCreate moved to act on User{} struct.
             - Reorganized functions that act on User{} struct.
             - Minor efficiency changes to getting Guilds/Channels while message processing.
             - Gamble win/loss ratio increased to be more "fair."

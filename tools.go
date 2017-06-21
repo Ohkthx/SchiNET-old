@@ -137,6 +137,10 @@ func (io *IOdat) ioHandler() (err error) {
 		fallthrough
 	case "add", "del", "edit":
 		err = io.dbCore()
+	case "ban":
+		u := UserNew(io.msg.Author)
+		s, err = u.Ban(io.guild.Name, io.msg.ChannelID, io.io)
+		io.msgEmbed = embedCreator(s, ColorGreen)
 	case "script", "scripts":
 		s, err = scriptCore(io.guild.Name, io.msg.Author, io.io, io.help)
 		io.msgEmbed = embedCreator(s, ColorGreen)

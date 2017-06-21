@@ -11,6 +11,8 @@ func (b *bot) core() {
 	var err error
 	reader := bufio.NewReader(os.Stdin)
 
+	channelsTemp()
+
 	for {
 		fmt.Printf("[%s] > ", time.Now().Format(time.Stamp))
 		input, _ := reader.ReadString('\n')

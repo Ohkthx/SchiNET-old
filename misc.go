@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -14,13 +15,13 @@ import (
 // Error constants for misc functions.
 var (
 	ErrGambleBadAmount = errors.New("bad amount of credits for action")
-	ErrGambleNotMin    = fmt.Errorf("did not provide enough to reach the minimum of %d", GambleMin)
+	ErrGambleNotMin    = func(a int) error { return fmt.Errorf("did not provide enough to reach the minimum of %d", a) }
 	ErrGambleNotEnough = errors.New("not enough credits")
 )
 
 // Constants for Gambling.
 const (
-	GambleCredits = "shards"
+	GambleCredits = "gold"
 	GambleMin     = 100
 )
 
@@ -72,7 +73,7 @@ func (io *IOdat) creditsGamble() error {
 			return ErrBadArgs
 		}
 		if toGamble < GambleMin {
-			return ErrGambleNotMin
+			return ErrGambleNotMin(GambleMin)
 		}
 	}
 	// Get user's credits from Database
@@ -82,10 +83,12 @@ func (io *IOdat) creditsGamble() error {
 	}
 
 	if all {
+		if u.Credits < (GambleMin / 2) {
+			return ErrGambleNotMin(GambleMin / 2)
+		}
 		toGamble = u.Credits
 		twealth = 0
 		spoils = creditsGambleResult(58, 40, 2, toGamble)
-		//spoils -= u.Credits
 	} else {
 		if toGamble > u.Credits {
 			return ErrGambleNotEnough
@@ -100,8 +103,8 @@ func (io *IOdat) creditsGamble() error {
 			"Result: **loss**\n"+
 			"%s remaining in bank: **%d**.",
 			io.user.ID, toGamble, GambleCredits, strings.Title(GambleCredits), twealth)
-		//mod = -toGamble
 		bu := UserNew(Bot.User)
+		bu.Credits += toGamble
 		err = bu.Update(io.guild.Name)
 		if err != nil {
 			return err
@@ -109,10 +112,8 @@ func (io *IOdat) creditsGamble() error {
 	} else {
 		if all {
 			twealth = spoils
-			//mod = spoils - u.Credits
 		} else {
 			twealth += spoils
-			//mod = spoils - toGamble
 		}
 		msg = fmt.Sprintf("<@%s> gambled **%d** %s\n"+
 			"Result: **Won**    spoils: **%d**\n"+
@@ -246,4 +247,45 @@ func pasteIt(msg, title string) (string, error) {
 	}
 
 	return paste.String(), nil
+}
+
+// Help prints help information for accessing script library.
+func Help(f *flag.FlagSet, prefix string) string {
+	var s string
+
+	s += prefix
+
+	f.VisitAll(func(fflag *flag.Flag) {
+		s += fmt.Sprintf("  -%s", fflag.Name) // Two spaces before -; see next two comments.
+		name, usage := flag.UnquoteUsage(fflag)
+		if len(name) > 0 {
+			s += " " + name
+		}
+		// Boolean flags of one ASCII letter are so common we
+		// treat them specially, putting their usage on the same line.
+		if len(s) <= 4 { // space, space, '-', 'x'.
+			s += "\t"
+		} else {
+			// Four spaces before the tab triggers good alignment
+			// for both 4- and 8-space tab stops.
+			s += "\n    \t"
+		}
+		s += usage + "\n"
+	})
+	return s
+}
+
+func channelsTemp() string {
+	var msg string
+	msg += "```C\n"
+	for k, c := range Bot.Links {
+		gg := Bot.GetGuild(k)
+		if strings.Contains(gg.Name, "verse") {
+			msg += fmt.Sprintf("Guild: [%s] [%s]\n", gg.Name, gg.ID)
+			for n, cc := range c {
+				msg += fmt.Sprintf("[%2d] Channel: [%16s] [%5s] [%s]\n", n, cc.Name, cc.Type, cc.ID)
+			}
+		}
+	}
+	return msg + "```"
 }

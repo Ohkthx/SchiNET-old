@@ -55,6 +55,30 @@ type User struct {
 	LastSeen      time.Time `bson:"lastseen"`
 }
 
+// Ban contains data pertaining to a ban.
+type Ban struct {
+	User     *UserBasic
+	Channels []chanBan
+	Amount   int
+	ByLast   *UserBasic
+	Last     time.Time `bson:"last"`
+}
+
+type chanBan struct {
+	Name      string
+	ChannelID string
+	Comment   string
+	By        *UserBasic
+	Date      time.Time
+}
+
+// UserBasic is just simple information to determine a user.
+type UserBasic struct {
+	ID            string
+	Name          string
+	Discriminator string
+}
+
 // Command structure for User Defined commands.
 type Command struct {
 	ID bson.ObjectId `bson:"_id,omitempty"`
