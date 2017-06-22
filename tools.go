@@ -31,6 +31,7 @@ const (
 func strToCommands(io string) ([2]bool, []string) {
 	var res [2]bool
 	var slice []string
+	var str, nw string
 
 	lastQuote := rune(0)
 	f := func(c rune) bool {
@@ -50,18 +51,18 @@ func strToCommands(io string) ([2]bool, []string) {
 	}
 
 	if strings.HasPrefix(io, envCMDPrefix) {
-		io = strings.TrimPrefix(io, envCMDPrefix)
+		str = strings.TrimPrefix(io, envCMDPrefix)
 		res[0] = true
 	}
-	s := strings.FieldsFunc(io, f)
+	s := strings.FieldsFunc(str, f)
 	for _, w := range s {
 		if strings.ToLower(w) == "help" {
 			res[1] = true
 			//s = append(s[:n], s[n+1:]...)
 		} else {
-			w = strings.TrimPrefix(w, "\"")
-			w = strings.TrimSuffix(w, "\"")
-			slice = append(slice, w)
+			nw = strings.TrimPrefix(w, "\"")
+			nw = strings.TrimSuffix(w, "\"")
+			slice = append(slice, nw)
 		}
 	}
 

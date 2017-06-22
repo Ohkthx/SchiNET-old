@@ -4,6 +4,8 @@
             - Script deleting had a flag preventing script from actually deleting.
             - Algorithm to get input into slice changed. 
                 Thanks to: Soheil Hassas Yeganeh @ https://groups.google.com/forum/#!topic/golang-nuts/pNwqLyfl2co
+            - Minor adjustment to text parsing, getting out of bounds.
+            - cfg *Config slowly starting to take the place of Bot and Mgo.
 
 0.4.2 - Additions:
             - Moving Bot&Mgo globals to Config{}.

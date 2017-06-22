@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/mgo.v2"
@@ -16,7 +17,7 @@ type Message struct {
 	ChannelName string
 }
 
-func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var err error
 	var c *discordgo.Channel
 	if c, err = s.Channel(m.ChannelID); err != nil {
@@ -122,11 +123,34 @@ func msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	return
 }
 
-func newUserHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
+func (cfg *Config) newUserHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
 	if Bot != nil {
 		c := Bot.GetMainChannel(nu.GuildID)
 		msg := fmt.Sprintf("Welcome to the server, <@%s>!", nu.User.ID)
 		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
+
+		for _, ch := range Bot.Channels {
+			if ch.Name == "internal" {
+				tn := time.Now()
+				msg := fmt.Sprintf("__**%s**#%s__ joined the server @ %s\n",
+					nu.User.Username, nu.User.Discriminator, tn.Format(time.UnixDate))
+				s.ChannelMessageSendEmbed(ch.ID, embedCreator(msg, ColorBlue))
+			}
+		}
+	}
+}
+
+func delUserHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
+	fmt.Println("Got here.")
+	if Bot != nil {
+		for _, c := range Bot.Channels {
+			if c.Name == "internal" {
+				tn := time.Now()
+				msg := fmt.Sprintf("__**%s**#%s__ left the server @ %s\n",
+					du.User.Username, du.User.Discriminator, tn.Format(time.UnixDate))
+				s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
+			}
+		}
 	}
 }
 

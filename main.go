@@ -27,8 +27,7 @@ var Bot *godbot.Core
 var Mgo *mgo.Session
 
 func main() {
-
-	var binfo bot
+	//var binfo bot
 	var cfg = &Config{}
 
 	if envToken == "" {
@@ -41,8 +40,16 @@ func main() {
 		return
 	}
 
-	bot.MessageHandler(msghandler)
-	bot.NewUserHandler(newUserHandler)
+	cfg.Core = bot
+	cfg.DB, err = mgo.Dial(envDBUrl)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	bot.MessageHandler(cfg.msghandler)
+	bot.NewUserHandler(cfg.newUserHandler)
+	//bot.RemUserHandler(delUserHandler)
 	err = bot.Start()
 	if err != nil {
 		fmt.Println(err)
@@ -55,15 +62,8 @@ func main() {
 		}
 	}
 
-	binfo.Core = bot
+	//binfo.Core = bot
 	Bot = bot
-
-	cfg.Core = bot
-	cfg.DB, err = mgo.Dial(envDBUrl)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 
 	Mgo = cfg.DB
 
