@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,19 +90,32 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		}
 	}
 
-	if io.command == false {
-		return
-	}
-
 	var u = UserNew(m.Author)
 	if err := u.Get(io.guild.Name, m.Author.ID); err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	if io.io[0] == "takeover" {
+		if ok := u.HasPermission(permAdmin & permAscended); ok {
+			cfg.textTakeoverToggle(u.ID)
+			s.ChannelMessageSendEmbed(m.ChannelID, embedCreator(fmt.Sprintf("Takover enabled: %s", strconv.FormatBool(cfg.Takeover)), ColorGray))
+			return
+		}
+	} else if cfg.Takeover {
+		if cfg.TakeoverID == m.Author.ID {
+			s.ChannelMessageDelete(m.ChannelID, m.ID)
+			s.ChannelMessageSend(m.ChannelID, m.Author.String()+": "+m.Content)
+			return
+		}
+	} else if io.command == false {
+		return
+	}
+
 	if ok := u.HasPermission(permNormal); !ok {
 		return
 	}
+
 	err = io.ioHandler()
 	if err != nil {
 		io.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)

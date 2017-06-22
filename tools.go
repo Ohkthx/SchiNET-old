@@ -31,7 +31,6 @@ const (
 func strToCommands(io string) ([2]bool, []string) {
 	var res [2]bool
 	var slice []string
-	var str, nw string
 
 	lastQuote := rune(0)
 	f := func(c rune) bool {
@@ -50,6 +49,7 @@ func strToCommands(io string) ([2]bool, []string) {
 		}
 	}
 
+	var str = io
 	if strings.HasPrefix(io, envCMDPrefix) {
 		str = strings.TrimPrefix(io, envCMDPrefix)
 		res[0] = true
@@ -60,9 +60,9 @@ func strToCommands(io string) ([2]bool, []string) {
 			res[1] = true
 			//s = append(s[:n], s[n+1:]...)
 		} else {
-			nw = strings.TrimPrefix(w, "\"")
-			nw = strings.TrimSuffix(w, "\"")
-			slice = append(slice, nw)
+			w = strings.TrimPrefix(w, "\"")
+			w = strings.TrimSuffix(w, "\"")
+			slice = append(slice, w)
 		}
 	}
 
@@ -387,4 +387,14 @@ func messagesGet(cID string) (*DBMsg, error) {
 	u = dbdat.Document.(DBMsg)
 
 	return &u, nil
+}
+
+func (cfg *Config) textTakeoverToggle(uID string) {
+	if cfg.Takeover {
+		cfg.Takeover = false
+		cfg.TakeoverID = ""
+	} else {
+		cfg.Takeover = true
+		cfg.TakeoverID = uID
+	}
 }

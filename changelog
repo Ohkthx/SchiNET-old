@@ -1,5 +1,6 @@
 0.4.3 - Additions:
             - Message Integrity checking from CONSOLE. -> check [part of server name]
+            - Message takeover, bot replaces user text as if sent by bot.
         Fixes:
             - Script deleting had a flag preventing script from actually deleting.
             - Algorithm to get input into slice changed. 

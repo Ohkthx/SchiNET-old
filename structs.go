@@ -14,8 +14,10 @@ import (
 
 // Config holds information that needs to be readily accessible.
 type Config struct {
-	Core *godbot.Core
-	DB   *mgo.Session
+	Takeover   bool
+	TakeoverID string
+	Core       *godbot.Core
+	DB         *mgo.Session
 }
 
 // Bot is a wrapper for the godbot.Core
