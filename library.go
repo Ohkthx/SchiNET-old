@@ -24,7 +24,7 @@ const (
 	scriptSyntaxGet  = ",script  -user \"Username\"   -name \"Name Here\""
 	scriptSyntaxAdd  = ",script  -add   -name \"Name Here\"   -script \"Text goes here\""
 	scriptSyntaxEdit = ",script  -edit   -name \"Name Here\"   -script \"Text goes here\""
-	scriptSyntaxDel  = ",script  -del   -name \"Name Here\"   -script \"Text goes here\""
+	scriptSyntaxDel  = ",script  -del   -name \"Name Here\""
 
 	collectionName = "scripts"
 
@@ -230,7 +230,7 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 // Delete a script from a library.
 func (lib *Library) Delete() (string, error) {
 
-	if lib.Args&(argName|argScript) != (argName | argScript) {
+	if lib.Args&argName != argName {
 		return scriptSyntaxDel, nil
 	}
 

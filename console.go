@@ -22,8 +22,7 @@ func (cfg *Config) core() {
 		if len(iodat.io) > 0 {
 			if iodat.io[0] == "exit" {
 				break
-			} /*else if iodat.io[0] == "check" {
-				fmt.Println("Got Check?")
+			} else if iodat.io[0] == "check" {
 				msg, err := cfg.MessageIntegrityCheck(iodat.io[1])
 				if err != nil {
 					fmt.Println(err)
@@ -31,7 +30,7 @@ func (cfg *Config) core() {
 				}
 				fmt.Println(msg)
 				continue
-			}*/
+			}
 			err = iodat.ioHandler()
 			if err != nil {
 				fmt.Println(err)

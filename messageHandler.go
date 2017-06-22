@@ -143,7 +143,8 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 	var gID string
 	var found bool
 	for _, g := range cfg.Core.Guilds {
-		if g.Name == gName {
+		if strings.Contains(g.Name, gName) {
+			gName = g.Name
 			gID = g.ID
 			found = true
 			break
@@ -157,14 +158,20 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 	for _, c := range cfg.Core.Links[gID] {
 		var mID string
 		for {
+			var ok, bk bool
 			msgs, err := cfg.Core.Session.ChannelMessages(c.ID, 100, mID, "", "")
 			if err != nil {
 				return "", err
 			}
 
 			var cnt = len(msgs)
-			var ok, bk bool
+			if cnt == 0 {
+				bk = true
+				break
+			}
+
 			for n, m := range msgs {
+				mID = m.ID
 				msg := MessageNew(gName, c.Name, m)
 				if ok, err = msg.Update(); err != nil {
 					return "", err
@@ -172,7 +179,7 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 				if ok {
 					missed++
 				}
-				if n+1 == cnt {
+				if cnt < 100 && n+1 == cnt {
 					bk = true
 					break
 				}
@@ -203,7 +210,7 @@ func (m *Message) Update() (bool, error) {
 	var q = make(map[string]interface{})
 	q["id"] = m.ID
 
-	db := DBdatCreate(m.Database, CollectionMessages(m.ChannelName), discordgo.Message{}, q, nil)
+	db := DBdatCreate(m.Database, CollectionMessages(m.ChannelName), m.Message, q, nil)
 	if err := db.dbGet(discordgo.Message{}); err != nil {
 		if err == mgo.ErrNotFound {
 			// Insert the message into the database here.

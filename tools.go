@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -28,38 +29,38 @@ const (
 )
 
 func strToCommands(io string) ([2]bool, []string) {
-
-	var slice []string
-	var quoted bool
-	var quote string
 	var res [2]bool
+	var slice []string
 
-	s := strings.Fields(io)
+	lastQuote := rune(0)
+	f := func(c rune) bool {
+		switch {
+		case c == lastQuote:
+			lastQuote = rune(0)
+			return false
+		case lastQuote != rune(0):
+			return false
+		case unicode.In(c, unicode.Quotation_Mark):
+			lastQuote = c
+			return false
+		default:
+			return unicode.IsSpace(c)
 
-	for _, w := range s {
-		if strings.HasPrefix(w, envCMDPrefix) {
-			w = strings.TrimPrefix(w, envCMDPrefix)
-			res[0] = true
-		} else if strings.HasPrefix(w, "\"") && strings.HasSuffix(w, "\"") {
-			w = strings.TrimPrefix(w, "\"")
-			w = strings.TrimSuffix(w, "\"")
-		} else if strings.HasPrefix(w, "\"") && quoted == false {
-			w = strings.TrimPrefix(w, "\"")
-			quote += w + " "
-			quoted = true
-		} else if strings.HasSuffix(w, "\"") && quoted {
-			w = strings.TrimSuffix(w, "\"")
-			quote += w
-			w = quote
-			quoted = false
-			quote = ""
-		} else if quoted {
-			quote += w + " "
 		}
+	}
 
+	if strings.HasPrefix(io, envCMDPrefix) {
+		io = strings.TrimPrefix(io, envCMDPrefix)
+		res[0] = true
+	}
+	s := strings.FieldsFunc(io, f)
+	for _, w := range s {
 		if strings.ToLower(w) == "help" {
 			res[1] = true
-		} else if quoted == false {
+			//s = append(s[:n], s[n+1:]...)
+		} else {
+			w = strings.TrimPrefix(w, "\"")
+			w = strings.TrimSuffix(w, "\"")
 			slice = append(slice, w)
 		}
 	}
