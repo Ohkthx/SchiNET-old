@@ -311,7 +311,7 @@ func pasteIt(msg, title string) (string, error) {
 }
 
 // Help prints help information for accessing script library.
-func Help(f *flag.FlagSet, prefix string) string {
+func Help(f *flag.FlagSet, prefix, suffix string) string {
 	var s string
 
 	s += prefix
@@ -333,7 +333,7 @@ func Help(f *flag.FlagSet, prefix string) string {
 		}
 		s += usage + "\n"
 	})
-	return s
+	return s + suffix
 }
 
 func channelsTemp() string {

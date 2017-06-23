@@ -20,6 +20,9 @@ var (
 	ErrBadPermissions = errors.New("you do not have permissions to do that")
 	ErrBanChanExists  = errors.New("user already has a ban for that channel")
 	ErrBanNotFound    = errors.New("ban not found to clear")
+	banSyntaxHard     = ",ban -hard -user \"Username\"\n"
+	banSyntaxSoft     = ",ban  -soft   -user \"Username\"   -c \"Bug Exploits\"\n"
+	banSyntaxRemove   = ",ban  -soft   -user \"Username\"   -remove\n"
 )
 
 // Permission scheme constants.
@@ -209,7 +212,8 @@ func (u *User) Ban(database, cID string, io []string) (string, error) {
 		return "", ErrBadPermissions
 	} else if help {
 		prefix := "**Need** __type__ and __username__.\n\n"
-		return Help(fl, prefix), nil
+		suffix := "\n\nExamples:\n" + banSyntaxHard + banSyntaxSoft + banSyntaxRemove
+		return Help(fl, prefix, suffix), nil
 	} else if list {
 		return banList(database)
 	}
@@ -264,7 +268,8 @@ func (u *User) Ban(database, cID string, io []string) (string, error) {
 
 	} else {
 		prefix := "**Need** __type__ and __username__.\n\n"
-		return Help(fl, prefix), nil
+		suffix := "\n\nExamples:\n" + banSyntaxHard + banSyntaxSoft + banSyntaxRemove
+		return Help(fl, prefix, suffix), nil
 	}
 
 	return msg, nil

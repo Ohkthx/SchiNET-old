@@ -97,21 +97,20 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	if io.io[0] == "takeover" {
-		if ok := u.HasPermission(permAdmin & permAscended); ok {
+		if ok := u.HasPermission(permAscended); ok {
 			cfg.textTakeoverToggle(u.ID)
 			s.ChannelMessageSendEmbed(m.ChannelID, embedCreator(fmt.Sprintf("Takover enabled: %s", strconv.FormatBool(cfg.Takeover)), ColorGray))
 			return
 		}
-	} else if cfg.Takeover {
-		if cfg.TakeoverID == m.Author.ID {
-			s.ChannelMessageDelete(m.ChannelID, m.ID)
-			s.ChannelMessageSend(m.ChannelID, m.Author.String()+": "+m.Content)
-			return
-		}
+	} else if cfg.Takeover && cfg.TakeoverID == m.Author.ID {
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
+		s.ChannelMessageSend(m.ChannelID, m.Author.String()+": "+m.Content)
+		return
 	} else if io.command == false {
 		return
 	}
 
+	// User is banned and does not have basic permissions.
 	if ok := u.HasPermission(permNormal); !ok {
 		return
 	}

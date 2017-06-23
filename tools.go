@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
-	"unicode"
 
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -32,33 +32,36 @@ func strToCommands(io string) ([2]bool, []string) {
 	var res [2]bool
 	var slice []string
 
-	lastQuote := rune(0)
-	f := func(c rune) bool {
-		switch {
-		case c == lastQuote:
-			lastQuote = rune(0)
-			return false
-		case lastQuote != rune(0):
-			return false
-		case unicode.In(c, unicode.Quotation_Mark):
-			lastQuote = c
-			return false
-		default:
-			return unicode.IsSpace(c)
-
+	/*
+		lastQuote := rune(0)
+		f := func(c rune) bool {
+			switch {
+			case c == lastQuote:
+				lastQuote = rune(0)
+				return false
+			case lastQuote != rune(0):
+				return false
+			case unicode.In(c, unicode.Quotation_Mark):
+				lastQuote = c
+				return false
+			default:
+				return unicode.IsSpace(c)
+			}
 		}
-	}
+	*/
+	r := regexp.MustCompile("'.+'|\".+\"|\\S+")
 
 	var str = io
 	if strings.HasPrefix(io, envCMDPrefix) {
 		str = strings.TrimPrefix(io, envCMDPrefix)
 		res[0] = true
 	}
-	s := strings.FieldsFunc(str, f)
+
+	//s := strings.FieldsFunc(str, f)
+	s := r.FindAllString(str, -1)
 	for _, w := range s {
 		if strings.ToLower(w) == "help" {
 			res[1] = true
-			//s = append(s[:n], s[n+1:]...)
 		} else {
 			w = strings.TrimPrefix(w, "\"")
 			w = strings.TrimSuffix(w, "\"")

@@ -91,7 +91,7 @@ func scriptCore(server string, user *discordgo.User, io []string, help bool) (st
 	case lib.ArgHelp:
 		fallthrough
 	default:
-		msg = Help(lib.Flags, "")
+		msg = Help(lib.Flags, "", "")
 	}
 
 	if err != nil {
