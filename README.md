@@ -32,7 +32,9 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + ~~Last seen to Users~~
 + ~~Check user existing in Database.~~
 + Parsing in-game messages and sending to discord.
-+ Message -> Database integrity check.
++ ~~Message -> Database integrity check.~~
++ Discord Guild -> Guild chat.
++ Script Library: Accessing via IDs
 
 ### Versions
 See [changelog](https://github.com/d0x1p2/usmbot/blob/master/changelog)

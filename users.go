@@ -486,7 +486,7 @@ func banList(database string) (string, error) {
 
 		if len(b.Channels) > 0 || botban {
 			found = true
-			msg += fmt.Sprintf("\t**__%s#%s__**\n", b.User.Name, b.User.Discriminator)
+			msg += fmt.Sprintf("\t**__%s**#%s__\n", b.User.Name, b.User.Discriminator)
 			if botban {
 				msg += "\t\t**Bot Banned.**\n"
 			}

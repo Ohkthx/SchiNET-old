@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -11,14 +12,20 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version     = "0.4.3"
-	envToken     = os.Getenv("BOT_TOKEN")
-	envDBUrl     = os.Getenv("BOT_DBURL")
-	envCMDPrefix = os.Getenv("BOT_PREFIX")
-	envPBDK      = os.Getenv("BOT_PBDevKey")
-	envPBPW      = os.Getenv("BOT_PBPW")
-	envPB        = os.Getenv("BOT_PB")
+	_version       = "0.4.3"
+	envToken       = os.Getenv("BOT_TOKEN")
+	envDBUrl       = os.Getenv("BOT_DBURL")
+	envCMDPrefix   = os.Getenv("BOT_PREFIX")
+	envPBDK        = os.Getenv("BOT_PBDevKey")
+	envPBPW        = os.Getenv("BOT_PBPW")
+	envPB          = os.Getenv("BOT_PB")
+	consoleDisable bool
 )
+
+func init() {
+	flag.BoolVar(&consoleDisable, "console-disable", false, "Disable Console.")
+	flag.Parse()
+}
 
 // Bot Global interface for pulling discord information.
 var Bot *godbot.Core
@@ -74,7 +81,12 @@ func main() {
 			return
 		}
 	*/
-	cfg.core()
+
+	if !consoleDisable {
+		cfg.core()
+	} else {
+		select {}
+	}
 }
 
 func (cfg *Config) cleanup() {
