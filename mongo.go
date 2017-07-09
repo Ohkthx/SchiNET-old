@@ -4,20 +4,18 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/bwmarrin/discordgo"
-
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 // Error constants for database issues.
 var (
-	ErrNilInterface    = errors.New("nil interface provided")
-	ErrNilQuery        = errors.New("nil interface provided")
-	ErrNilChange       = errors.New("nil change provided")
-	ErrUnknownType     = errors.New("unknown type")
-	ErrBadInterface    = errors.New("bad interface, unknown in switch")
-	CollectionMessages = func(c string) string { return "messages." + c }
+	ErrNilInterface = errors.New("nil interface provided")
+	ErrNilQuery     = errors.New("nil interface provided")
+	ErrNilChange    = errors.New("nil change provided")
+	ErrUnknownType  = errors.New("unknown type")
+	ErrBadInterface = errors.New("bad interface, unknown in switch")
+	//CollectionMessages = func(c string) string { return "messages." + c }
 )
 
 // Collection constants
@@ -28,6 +26,7 @@ const (
 	CollectionGamble    = "gamble"
 	CollectionConfigs   = "config"
 	CollectionScripts   = "library"
+	CollectionMessages  = "messages"
 )
 
 // DBdat passes information as to what to store into a database.
@@ -39,15 +38,6 @@ type DBdat struct {
 	Documents  []interface{}
 	Query      bson.M
 	Change     bson.M
-}
-
-// DBMsg stores information on messages last processed.
-type DBMsg struct {
-	ID      string
-	MTotal  int
-	MIDr    string // Message ID of most recent.
-	MIDf    string // Message ID of first message.
-	Content string
 }
 
 //DBHandler Stores a MongoDB connection.
@@ -192,16 +182,6 @@ func (io *IOdat) dbCore() (err error) {
 	var s string
 	if len(io.io) > 1 {
 		switch strings.ToLower(io.io[1]) {
-		case "event", "events":
-			switch strings.ToLower(io.io[0]) {
-			case "add":
-				err = io.miscAddEvent()
-			case "edit":
-				err = io.miscEditEvent()
-			case "del":
-				err = io.miscDelEvent()
-			}
-			return
 		case "script", "scripts":
 			s, err = scriptCore(io.guild.Name, io.msg.Author, io.io, io.help)
 			io.msgEmbed = embedCreator(s, ColorGreen)
@@ -215,8 +195,12 @@ func (io *IOdat) dbCore() (err error) {
 	}
 
 	switch io.io[0] {
-	case "event":
-		err = io.miscGetEvents()
+	case "event", "events":
+		msg, err := io.Events(io.guild.Name, io.user.ID, io.io)
+		if msg != "" {
+			io.msgEmbed = embedCreator(msg, ColorBlue)
+		}
+		return err
 	case "add":
 		dbdat := DBdatCreate(io.guild.Name, "commands", Command{}, nil, nil)
 		err = dbdat.dbInsert()
@@ -234,10 +218,6 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var e Event
 		bson.Unmarshal(byt, &e)
 		return e, nil
-	case DBMsg:
-		var d DBMsg
-		bson.Unmarshal(byt, &d)
-		return d, nil
 	case User:
 		var u User
 		bson.Unmarshal(byt, &u)
@@ -250,8 +230,8 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var b Ban
 		bson.Unmarshal(byt, &b)
 		return b, nil
-	case discordgo.Message:
-		var m discordgo.Message
+	case Message:
+		var m Message
 		bson.Unmarshal(byt, &m)
 		return m, nil
 	default:

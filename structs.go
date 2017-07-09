@@ -42,11 +42,25 @@ type IOdat struct {
 	msgEmbed *discordgo.MessageEmbed
 }
 
+// Message holds basic information related to a specific message.
+type Message struct {
+	ID              string
+	ChannelName     string
+	ChannelID       string
+	Content         string
+	EditedContent   []string
+	Timestamp       time.Time
+	EditedTimestamp time.Time
+	Author          *User
+	AuthorMsg       int
+}
+
 // Event has information regarding upcoming events.
 type Event struct {
 	ID          bson.ObjectId `bson:"_id,omitempty"`
 	Description string
 	Day         string
+	HHMM        string
 	Time        time.Time
 	Protected   bool
 	AddedBy     *User

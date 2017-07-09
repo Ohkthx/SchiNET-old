@@ -20,7 +20,7 @@ var (
 	ErrBadPermissions = errors.New("you do not have permissions to do that")
 	ErrBanChanExists  = errors.New("user already has a ban for that channel")
 	ErrBanNotFound    = errors.New("ban not found to clear")
-	banSyntaxHard     = ",ban -hard -user \"Username\"\n"
+	banSyntaxHard     = ",ban  -hard -user \"Username\"\n"
 	banSyntaxSoft     = ",ban  -soft   -user \"Username\"   -c \"Bug Exploits\"\n"
 	banSyntaxRemove   = ",ban  -soft   -user \"Username\"   -remove\n"
 )
@@ -104,6 +104,7 @@ func (u *User) Update(database string) error {
 
 	q["id"] = u.ID
 	c["$set"] = bson.M{
+		"username":     u.Username,
 		"creditstotal": u.CreditsTotal,
 		"credits":      u.Credits,
 		"access":       u.Access,
@@ -176,6 +177,16 @@ func (u *User) EmbedCreate() *discordgo.MessageEmbed {
 	}
 }
 
+// String produces a Username#Discriminator string.
+func (u *User) String() string {
+	return u.Username + "#" + u.Discriminator
+}
+
+// StringPretty produces elegant looking string.
+func (u *User) StringPretty() string {
+	return "**" + u.Username + "**#" + u.Discriminator
+}
+
 // Ban will remove a player from the server
 func (u *User) Ban(database, cID string, io []string) (string, error) {
 	var msg, idp, id, comment string             // Message to send and IDs
@@ -195,6 +206,7 @@ func (u *User) Ban(database, cID string, io []string) (string, error) {
 		return "", err
 	}
 
+	// Properly format ID string given by the person performing the ban.
 	if idp != "" {
 		ids := strings.FieldsFunc(idp, idSplit)
 		id = ids[0]

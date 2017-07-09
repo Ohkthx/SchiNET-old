@@ -12,7 +12,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.4.3"
+	_version       = "0.4.4"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -73,14 +73,6 @@ func main() {
 	Bot = bot
 
 	Mgo = cfg.DB
-
-	/*
-		err = messagesProcessStartup()
-		if err != nil {
-			fmt.Println("messageProcessStartup()", err)
-			return
-		}
-	*/
 
 	if !consoleDisable {
 		cfg.core()

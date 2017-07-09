@@ -31,7 +31,7 @@ func (cfg *Config) core() {
 				fmt.Println(msg)
 				continue
 			}
-			err = iodat.ioHandler()
+			err = cfg.ioHandler(iodat)
 			if err != nil {
 				fmt.Println(err)
 			}

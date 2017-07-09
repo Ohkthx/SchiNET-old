@@ -2,11 +2,13 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -17,91 +19,131 @@ var (
 	ErrBadArgs    = errors.New("you did not specify enough arguments")
 )
 
-func (io *IOdat) miscAddEvent() error {
-	var future time.Time
-	var now = time.Now()
-	var protect bool
+// Constants for producing helpful text for normal command operations.
+const (
+	eventSyntaxAdd  = ",event   -add   -d \"Weekday\"   -t \"Time\"   -c \"Comment\"\n"
+	eventSyntaxDel  = ",event   -d \"Weekday\"   -t \"Time\"   -remove\n"
+	eventSyntaxEdit = ",event   -edit   -d \"Weekday\"   -t \"Time\"   -c \"Comment\"\n"
+	eventSyntaxAll  = eventSyntaxAdd + eventSyntaxEdit + eventSyntaxDel
+)
 
-	if len(io.io) < 5 {
-		return ErrBadArgs
-	} else if len(io.io) == 6 {
-		if strings.ToLower(io.io[5]) == "true" {
-			protect = true
+// Events handles all event related commands from input.
+func (io *IOdat) Events(database, id string, command []string) (string, error) {
+	var add, del, edit, persist, help, list bool
+	var comment, day, time string
+	fl := flag.NewFlagSet("event", flag.ContinueOnError)
+	fl.BoolVar(&add, "add", false, "Add an Event")
+	fl.BoolVar(&edit, "edit", false, "Edit an Event")
+	fl.BoolVar(&del, "remove", false, "Delete an Event")
+	fl.BoolVar(&persist, "persist", false, "Reoccuring Event")
+	fl.BoolVar(&help, "help", false, "Prints this")
+	fl.BoolVar(&list, "list", false, "List all Events")
+	fl.StringVar(&day, "d", "", "Weekday of Event")
+	fl.StringVar(&time, "t", "12:00", "Time Occuring [12:00 default]")
+	fl.StringVar(&comment, "c", "", "Event Information/Comment")
+	if err := fl.Parse(command[1:]); err != nil {
+		return "", err
+	}
+
+	if help {
+		prefix := "**Need** __command__,  __day__.\n\n"
+		suffix := "\n\nExamples:\n" + eventSyntaxAll
+		return Help(fl, prefix, suffix), nil
+	} else if list {
+		return "", io.GetEvents()
+	}
+
+	if (add || edit || del) && day != "" {
+		if ok := io.user.HasPermission(permAdmin); !ok {
+			return "", ErrBadPermissions
+		}
+		ev, err := EventNew(comment, day, time, io.user, persist)
+		if err != nil {
+			return "", err
+		}
+
+		switch {
+		case add:
+			return ev.Add(database)
+		case edit:
+			return ev.Edit(database)
+		case del:
+			return ev.Delete(database)
 		}
 	}
 
-	// Fields:
-	// 0 - command, 1 - event, 2 - weekday, 3 - time, 4 - message, 5 - protected.
-	da, err := evDayAdd(io.io[2])
-	if err != nil {
-		return err
-	}
-	hhmm, err := evHHMM(io.io[3])
-	if err != nil {
-		return err
-	}
-
-	future = time.Date(now.Year(), now.Month(), now.Day()+da, hhmm[0], hhmm[1], 0, 0, now.Location())
-
-	var e = Event{
-		Description: io.io[4],
-		Day:         io.io[2],
-		Time:        future,
-		Protected:   protect,
-		AddedBy:     io.user,
-	}
-
-	dbdat := DBdatCreate(io.guild.Name, CollectionEvents, e, nil, nil)
-	err = dbdat.dbInsert()
-	if err != nil {
-		return err
-	}
-
-	msg := fmt.Sprintf("<@%s> added an event: **%s**", io.msg.Author.ID, e.Description)
-	io.msgEmbed = embedCreator(msg, ColorGreen)
-
-	return nil
+	return "", io.GetEvents()
 }
 
-func (io *IOdat) miscEditEvent() error {
-	return nil
+// EventNew creates a new Event object that can be acted on.
+func EventNew(desc, day, t string, u *User, persist bool) (*Event, error) {
+
+	da, err := evDayAdd(day)
+	if err != nil {
+		return nil, err
+	}
+	hhmm, err := evHHMM(t)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	ts := time.Date(now.Year(), now.Month(), now.Day()+da, hhmm[0], hhmm[1], 0, 0, now.Location())
+
+	return &Event{
+		Description: desc,
+		Day:         day,
+		HHMM:        t,
+		Time:        ts,
+		Protected:   persist,
+		AddedBy:     u,
+	}, nil
 }
 
-func (io *IOdat) miscDelEvent() error {
-	if len(io.io) < 4 {
-		return ErrBadArgs
+// Add stores an Event in the Database.
+func (ev *Event) Add(database string) (string, error) {
+
+	dbdat := DBdatCreate(database, CollectionEvents, ev, nil, nil)
+	if err := dbdat.dbInsert(); err != nil {
+		return "", err
 	}
 
-	_, err := evDayAdd(io.io[2])
-	if err != nil {
-		return err
-	}
+	msg := fmt.Sprintf("%s added an event: **%s**", ev.AddedBy.StringPretty(), ev.Description)
 
-	t, err := io.evTime(io.io[3], false)
-	if err != nil {
-		return err
-	}
+	return msg, nil
+}
+
+// Edit modifies an event inside the database.
+func (ev *Event) Edit(database string) (string, error) {
+	return "Command not functional yet.", nil
+}
+
+// Delete removes an event from the database.
+func (ev *Event) Delete(database string) (string, error) {
+
 	var q = make(map[string]interface{})
-	q["$and"] = []bson.M{bson.M{"day": io.io[2]}, bson.M{"time": t}}
-	var dbdat = DBdatCreate(io.guild.Name, CollectionEvents, Event{}, q, nil)
-	err = dbdat.dbGet(Event{})
-	if err != nil {
-		return err
+
+	q["$and"] = []bson.M{bson.M{"day": ev.Day}, bson.M{"time": ev.Time}}
+	var dbdat = DBdatCreate(database, CollectionEvents, Event{}, q, nil)
+	if err := dbdat.dbGet(Event{}); err != nil {
+		if err == mgo.ErrNotFound {
+			return "", fmt.Errorf("event not found: %s -> %s", ev.Day, ev.HHMM)
+		}
+		return "", err
 	}
 
-	var ev = dbdat.Document.(Event)
-	err = dbdat.dbDeleteID(ev.ID)
-	if err != nil {
-		return err
+	var e = dbdat.Document.(Event)
+	if err := dbdat.dbDeleteID(e.ID); err != nil {
+		return "", err
 	}
 
-	msg := fmt.Sprintf("<@%s> removed the event on **%s** at **%s**.", io.user.ID, io.io[2], io.io[3])
-	io.msgEmbed = embedCreator(msg, ColorMaroon)
+	msg := fmt.Sprintf("%s removed the event on **%s**.", ev.AddedBy.StringPretty(), ev.Day)
 
-	return nil
+	return msg, nil
 }
 
-func (io *IOdat) miscGetEvents() error {
+// GetEvents for the local server.
+func (io *IOdat) GetEvents() error {
 	var events []string
 	var msg string
 	var err error
@@ -109,6 +151,11 @@ func (io *IOdat) miscGetEvents() error {
 
 	dbdat := DBdatCreate(io.guild.Name, CollectionEvents, nil, nil, nil)
 	dbdat.dbGetAll(Event{})
+
+	if len(dbdat.Documents) == 0 {
+		io.msgEmbed = embedCreator("No events found", ColorMaroon)
+		return nil
+	}
 
 	msg = "Upcoming Events:```C\n"
 	for n, e := range dbdat.Documents {

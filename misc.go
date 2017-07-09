@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ var (
 const (
 	GambleCredits = "gold"
 	GambleMin     = 100
+	GraphY        = 20
 )
 
 func (io *IOdat) miscRoll() {
@@ -349,4 +351,137 @@ func channelsTemp() string {
 		}
 	}
 	return msg + "```"
+}
+
+func (io *IOdat) histograph(s *discordgo.Session, database string) error {
+	var snd string
+	var mp = make(map[int]map[int]int)
+
+	// Get ALL messages from Database
+	dat := DBdatCreate(database, CollectionMessages, Message{}, nil, nil)
+	if err := dat.dbGetAll(Message{}); err != nil {
+		return err
+	}
+
+	if len(dat.Documents) == 0 {
+		return fmt.Errorf("no documents found")
+	}
+
+	var msg Message
+	for _, d := range dat.Documents {
+		msg = d.(Message)
+		t := msg.Timestamp
+		if _, ok := mp[t.Year()]; !ok {
+			mp[t.Year()] = make(map[int]int)
+		}
+		mp[t.Year()][int(t.Month())]++
+	}
+
+	var t [12]int
+	var keys []int
+	for k := range mp {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	// Calculate and send the Histograms for each year.
+	for _, k := range keys {
+		snd += fmt.Sprintf("Year: %d\n", k)
+		var m [12]int
+		var starMax, star int
+		for _, cnt := range mp[k] {
+			if cnt > starMax {
+				starMax = cnt
+			}
+		}
+
+		star = starMax / GraphY
+		// If there isn't enough messages... skip to the next year.
+		if star == 0 {
+			snd += "\tNot enough data.\n"
+			s.ChannelMessageSend(io.msg.ChannelID, "```"+snd+"```")
+			snd = ""
+			continue
+		}
+		for mon, cnt := range mp[k] {
+			m[mon-1] = cnt / star
+			t[mon-1] += cnt
+		}
+
+		starMax = GraphY
+		for starMax > 0 {
+			var ln string
+			for n, amt := range m {
+				if starMax > 0 {
+					if amt == starMax {
+						ln += fmt.Sprintf("  █  ")
+						m[n]--
+					} else {
+						ln += fmt.Sprintf("     ")
+					}
+				}
+				// If N is len(m), print the newline
+				if n+1 == len(m) {
+					for i := len(ln); i > 0; i-- {
+						if ln[i-1] != ' ' {
+							break
+						}
+						ln = strings.TrimSuffix(ln, " ")
+					}
+
+					snd += ln + "\n"
+					break
+				}
+
+			}
+			// If loop n == len, print newline
+			if starMax-1 == 0 {
+				for i := 0; i < 12; i++ {
+					snd += fmt.Sprintf(" %s ", monToString(i+1))
+				}
+				s.ChannelMessageSend(io.msg.ChannelID, fmt.Sprintf("```%s```", snd))
+				snd = ""
+			}
+			starMax--
+		}
+	}
+
+	// Calculate based on month
+	var res string
+	res += "Mon: Message Count\n"
+	for n, c := range t {
+		res += fmt.Sprintf("%s: %d\n", monToString(n+1), c)
+	}
+	s.ChannelMessageSend(io.msg.ChannelID, "```"+res+"```")
+
+	return nil
+}
+
+func monToString(i int) string {
+	switch i {
+	case 1:
+		return "jan"
+	case 2:
+		return "feb"
+	case 3:
+		return "mar"
+	case 4:
+		return "apr"
+	case 5:
+		return "may"
+	case 6:
+		return "jun"
+	case 7:
+		return "jul"
+	case 8:
+		return "aug"
+	case 9:
+		return "sep"
+	case 10:
+		return "oct"
+	case 11:
+		return "nov"
+	case 12:
+		return "dec"
+	}
+	return ""
 }

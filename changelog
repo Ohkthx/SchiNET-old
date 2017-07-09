@@ -1,3 +1,17 @@
+0.4.4 - Additions:
+            - Events now work with flag parsing like Ban and Script.
+            - Histograph of messages for a particular server/guild.
+        Removals:
+            - Message processing on startup. Larger channels can not use this- also
+                alerts all users "new" messages happened. Spams Audit log.
+        Fixes:
+            - Message struct changed to store more accurate and usable information.
+            - Message logging modified to store all messages in central location in database.
+            - Event related functions now act on an Event object.
+            - Usernames are now updated in Database based on ID.
+            - New user greetings is now Mobile friendly.
+            - Ban syntax fixed.
+
 0.4.3 - Additions:
             - Message Integrity checking from CONSOLE. -> check [part of server name]
             - Message takeover, bot replaces user text as if sent by bot.

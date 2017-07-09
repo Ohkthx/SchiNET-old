@@ -3,20 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/mgo.v2"
 )
-
-// Message just holds a message.
-type Message struct {
-	*discordgo.Message
-	Database    string
-	ChannelName string
-}
 
 func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var err error
@@ -47,47 +39,17 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		}
 		return
 		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
-	} else {
-		// Log message into Database
-		if err := messageLog(io.guild.Name, c.Name, m.Message); err != nil {
-			fmt.Println(err)
-		}
-		// End logging message
+	}
 
-		if io.command == false {
-			ts, _ := m.Timestamp.Parse()
-			err = UserUpdateSimple(io.guild.Name, m.Author, 1, ts)
-			if err != nil {
-				fmt.Println("updating users credits", err)
-			}
-		}
-		var d *DBMsg
-		d, err = messagesGet(m.ChannelID)
-		if err != nil {
-			if err != mgo.ErrNotFound {
-				fmt.Println(err)
-			} else {
-				d = &DBMsg{
-					MIDr:    m.ID,
-					MIDf:    m.ID,
-					Content: m.Content,
-					ID:      m.ChannelID,
-					MTotal:  1,
-				}
-				err = messagesUpdate(d)
-				if err != nil {
-					fmt.Println(err)
-				}
-			}
-		} else {
-			d.MIDr = m.ID
-			d.MTotal++
-			d.Content = m.Content
-			err = messagesUpdate(d)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
+	// Log message into Database
+	if err := messageLog(io.guild.Name, c.Name, m.Message); err != nil {
+		fmt.Println(err)
+	}
+	// End logging message
+
+	// Return due to not being a command and/or just an Embed.
+	if io.command == false || len(io.io) == 0 {
+		return
 	}
 
 	var u = UserNew(m.Author)
@@ -96,26 +58,19 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
+	io.user = u
+
+	var tko bool
 	if io.io[0] == "takeover" {
-		if ok := u.HasPermission(permAscended); ok {
-			cfg.textTakeoverToggle(u.ID)
-			s.ChannelMessageSendEmbed(m.ChannelID, embedCreator(fmt.Sprintf("Takover enabled: %s", strconv.FormatBool(cfg.Takeover)), ColorGray))
-			return
-		}
-	} else if cfg.Takeover && cfg.TakeoverID == m.Author.ID {
-		s.ChannelMessageDelete(m.ChannelID, m.ID)
-		s.ChannelMessageSend(m.ChannelID, m.Author.String()+": "+m.Content)
+		tko = true
+	}
+	if ok := cfg.takeoverCheck(m.ID, m.ChannelID, m.Content, tko, u); ok {
 		return
-	} else if io.command == false {
+	} else if ok := u.HasPermission(permNormal); !ok {
 		return
 	}
 
-	// User is banned and does not have basic permissions.
-	if ok := u.HasPermission(permNormal); !ok {
-		return
-	}
-
-	err = io.ioHandler()
+	err = cfg.ioHandler(io)
 	if err != nil {
 		io.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)
 		//return
@@ -139,7 +94,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 func (cfg *Config) newUserHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
 	if Bot != nil {
 		c := Bot.GetMainChannel(nu.GuildID)
-		msg := fmt.Sprintf("Welcome to the server, <@%s>!", nu.User.ID)
+		msg := fmt.Sprintf("Welcome to the server, __**%s**#%s__!", nu.User.Username, nu.User.Discriminator)
 		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
 
 		for _, ch := range Bot.Channels {
@@ -167,8 +122,15 @@ func delUserHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
 	}
 }
 
-func messageLog(database, channel string, m *discordgo.Message) error {
-	db := DBdatCreate(database, CollectionMessages(channel), m, nil, nil)
+func messageLog(database, channel string, msg *discordgo.Message) error {
+
+	ts, _ := msg.Timestamp.Parse()
+	if err := UserUpdateSimple(database, msg.Author, 1, ts); err != nil {
+		fmt.Println("updating/adding user", err)
+	}
+
+	m := MessageNew(database, channel, msg)
+	db := DBdatCreate(database, CollectionMessages, m, nil, nil)
 	if err := db.dbInsert(); err != nil {
 		return err
 	}
@@ -209,10 +171,17 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 
 			for n, m := range msgs {
 				mID = m.ID
-				msg := MessageNew(gName, c.Name, m)
-				if ok, err = msg.Update(); err != nil {
-					return "", err
+				/*
+					msg := MessageNew(gName, c.Name, m)
+					if ok, err = msg.Update(gName); err != nil {
+						return "", err
+					}
+				*/
+
+				if err := messageLog(gName, c.Name, m); err != nil {
+					fmt.Println("Error logging message", err.Error())
 				}
+
 				if ok {
 					missed++
 				}
@@ -235,19 +204,43 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 
 // MessageNew returns a new message object.
 func MessageNew(database, channel string, m *discordgo.Message) *Message {
+	u := UserNew(m.Author)
+	if err := u.Get(database, m.Author.ID); err != nil {
+		// Most likely not found or first message.
+		if err1 := u.Update(database); err1 != nil {
+			// Database error. Log error.
+		}
+	}
+
+	var ts, ets time.Time
+	var err error
+	if ts, err = m.Timestamp.Parse(); err != nil {
+		// Log error.
+	}
+
+	if ets, err = m.EditedTimestamp.Parse(); err != nil {
+		// Log error.
+	}
+
 	return &Message{
-		Database:    database,
-		ChannelName: channel,
-		Message:     m,
+		//Database:    database,
+		ID:              m.ID,
+		ChannelID:       m.ChannelID,
+		ChannelName:     channel,
+		Content:         m.Content,
+		Timestamp:       ts,
+		EditedTimestamp: ets,
+		Author:          u,
+		AuthorMsg:       u.CreditsTotal,
 	}
 }
 
 // Update Checks and if not exists... Adds to the database.
-func (m *Message) Update() (bool, error) {
+func (m *Message) Update(database string) (bool, error) {
 	var q = make(map[string]interface{})
 	q["id"] = m.ID
 
-	db := DBdatCreate(m.Database, CollectionMessages(m.ChannelName), m.Message, q, nil)
+	db := DBdatCreate(database, CollectionMessages, m, q, nil)
 	if err := db.dbGet(discordgo.Message{}); err != nil {
 		if err == mgo.ErrNotFound {
 			// Insert the message into the database here.
