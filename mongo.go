@@ -27,6 +27,7 @@ const (
 	CollectionConfigs   = "config"
 	CollectionScripts   = "library"
 	CollectionMessages  = "messages"
+	CollectionAlias     = "aliases"
 )
 
 // DBdat passes information as to what to store into a database.
@@ -183,7 +184,7 @@ func (io *IOdat) dbCore() (err error) {
 	if len(io.io) > 1 {
 		switch strings.ToLower(io.io[1]) {
 		case "script", "scripts":
-			s, err = scriptCore(io.guild.Name, io.msg.Author, io.io, io.help)
+			s, err = scriptCore(io.guild.Name, io.msg.Author, io.io)
 			io.msgEmbed = embedCreator(s, ColorGreen)
 		}
 	}
@@ -234,6 +235,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var m Message
 		bson.Unmarshal(byt, &m)
 		return m, nil
+	case Alias:
+		var a Alias
+		bson.Unmarshal(byt, &a)
+		return a, nil
 	default:
 		return nil, ErrBadInterface
 	}

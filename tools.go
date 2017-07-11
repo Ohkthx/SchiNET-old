@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
+	"gopkg.in/mgo.v2"
 )
 
 // Error constants.
@@ -26,8 +27,8 @@ const (
 	ColorYellow = 0xFEEB65
 )
 
-func strToCommands(io string) ([2]bool, []string) {
-	var res [2]bool
+func strToCommands(io string) (bool, []string) {
+	var cmd bool
 	var slice []string
 
 	lastQuote := rune(0)
@@ -49,16 +50,11 @@ func strToCommands(io string) ([2]bool, []string) {
 	var str = io
 	if strings.HasPrefix(io, envCMDPrefix) {
 		str = strings.TrimPrefix(io, envCMDPrefix)
-		res[0] = true
+		cmd = true
 	}
 
 	s := strings.FieldsFunc(str, f)
 	for _, w := range s {
-		if strings.ToLower(w) == "help" {
-			res[1] = true
-			continue
-		}
-
 		if strings.HasPrefix(w, "\"") {
 			w = strings.TrimPrefix(w, "\"")
 		}
@@ -68,20 +64,17 @@ func strToCommands(io string) ([2]bool, []string) {
 		slice = append(slice, w)
 	}
 
-	return res, slice
+	return cmd, slice
 }
 
 func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 	var io IOdat
 	u := msg.Author
-	var b [2]bool
 
-	b, io.io = strToCommands(msg.Content)
+	io.command, io.io = strToCommands(msg.Content)
 	io.input = msg.Content
 	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
 	io.msg = msg
-	io.command = b[0]
-	io.help = b[1]
 
 	return &io
 }
@@ -89,11 +82,8 @@ func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 func sliceToIOdat(b *godbot.Core, s []string) *IOdat {
 	u := b.User
 	var io IOdat
-	var bol [2]bool
 	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
-	bol, io.io = strToCommands(strings.Join(s, " "))
-	io.command = bol[0]
-	io.help = bol[1]
+	io.command, io.io = strToCommands(strings.Join(s, " "))
 
 	return &io
 }
@@ -127,28 +117,38 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		return nil
 	}
 
+	// Check if an alias here
+	alias := AliasNew(io.io[0], "", io.user)
+	link, err := alias.Check()
+	if err != nil {
+		if err != mgo.ErrNotFound {
+			return err
+		}
+	} else {
+		fmt.Println("Alias found:", link)
+		io.io = aliasConv(io.io[0], link, io.input)
+	}
+
 	command := io.io[0]
 	switch strings.ToLower(command) {
+	case "help":
+		io.msgEmbed = embedCreator(globalHelp(), ColorYellow)
 	case "roll":
 		io.miscRoll()
 	case "top10":
 		io.miscTop10()
-	case "gamble":
-		err = io.creditsGamble()
-	case "credits", "user", "xfer":
-		err = io.creditsPrint()
+	case "user":
+		err = io.CoreUser()
+	case "alias":
+		err = io.CoreAlias()
 	case "histo":
 		err = io.histograph(cfg.Core.Session, io.guild.Name)
 	case "event", "events":
 		fallthrough
 	case "add", "del", "edit":
 		err = io.dbCore()
-	case "ban":
-		u := UserNew(io.msg.Author)
-		s, err = u.Ban(io.guild.Name, io.msg.ChannelID, io.io)
-		io.msgEmbed = embedCreator(s, ColorGreen)
 	case "script", "scripts":
-		s, err = scriptCore(io.guild.Name, io.msg.Author, io.io, io.help)
+		s, err = scriptCore(io.guild.Name, io.msg.Author, io.io)
 		io.msgEmbed = embedCreator(s, ColorGreen)
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
@@ -190,4 +190,16 @@ func (cfg *Config) textTakeoverToggle(uID string) {
 		cfg.Takeover = true
 		cfg.TakeoverID = uID
 	}
+}
+
+func globalHelp() string {
+	var msg = "*Most commands have a '-help' ability."
+	for t, cmd := range cmds {
+		msg += fmt.Sprintf("\n\n[ %s ]", t)
+		fmt.Printf("[ %s ]", t)
+		for c, txt := range cmd {
+			msg += fmt.Sprintf("\n\t%s\n\t\t%s", c, txt)
+		}
+	}
+	return "```" + msg + "```"
 }

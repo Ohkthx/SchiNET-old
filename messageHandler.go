@@ -42,7 +42,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	// Log message into Database
-	if err := messageLog(io.guild.Name, c.Name, m.Message); err != nil {
+	if _, err := messageLog(io.guild.Name, c.Name, m.Message); err != nil {
 		fmt.Println(err)
 	}
 	// End logging message
@@ -52,8 +52,8 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
-	var u = UserNew(m.Author)
-	if err := u.Get(io.guild.Name, m.Author.ID); err != nil {
+	var u = UserNew(io.guild.Name, m.Author)
+	if err := u.Get(m.Author.ID); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -122,19 +122,19 @@ func delUserHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
 	}
 }
 
-func messageLog(database, channel string, msg *discordgo.Message) error {
-
-	ts, _ := msg.Timestamp.Parse()
-	if err := UserUpdateSimple(database, msg.Author, 1, ts); err != nil {
-		fmt.Println("updating/adding user", err)
-	}
+func messageLog(database, channel string, msg *discordgo.Message) (bool, error) {
 
 	m := MessageNew(database, channel, msg)
-	db := DBdatCreate(database, CollectionMessages, m, nil, nil)
-	if err := db.dbInsert(); err != nil {
-		return err
+	if ok, err := m.Update(database); err != nil {
+		return false, err
+	} else if ok {
+		ts, _ := msg.Timestamp.Parse()
+		if err := UserUpdateSimple(database, msg.Author, 1, ts); err != nil {
+			fmt.Println("updating/adding user", err)
+		}
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 // MessageIntegrityCheck erifies the integrity of channels of a specific guild.
@@ -157,7 +157,7 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 	for _, c := range cfg.Core.Links[gID] {
 		var mID string
 		for {
-			var ok, bk bool
+			var bk bool
 			msgs, err := cfg.Core.Session.ChannelMessages(c.ID, 100, mID, "", "")
 			if err != nil {
 				return "", err
@@ -171,20 +171,13 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 
 			for n, m := range msgs {
 				mID = m.ID
-				/*
-					msg := MessageNew(gName, c.Name, m)
-					if ok, err = msg.Update(gName); err != nil {
-						return "", err
-					}
-				*/
 
-				if err := messageLog(gName, c.Name, m); err != nil {
+				if ok, err := messageLog(gName, c.Name, m); err != nil {
 					fmt.Println("Error logging message", err.Error())
-				}
-
-				if ok {
+				} else if ok {
 					missed++
 				}
+
 				if cnt < 100 && n+1 == cnt {
 					bk = true
 					break
@@ -204,10 +197,10 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 
 // MessageNew returns a new message object.
 func MessageNew(database, channel string, m *discordgo.Message) *Message {
-	u := UserNew(m.Author)
-	if err := u.Get(database, m.Author.ID); err != nil {
+	u := UserNew(database, m.Author)
+	if err := u.Get(m.Author.ID); err != nil {
 		// Most likely not found or first message.
-		if err1 := u.Update(database); err1 != nil {
+		if err1 := u.Update(); err1 != nil {
 			// Database error. Log error.
 		}
 	}
@@ -241,7 +234,7 @@ func (m *Message) Update(database string) (bool, error) {
 	q["id"] = m.ID
 
 	db := DBdatCreate(database, CollectionMessages, m, q, nil)
-	if err := db.dbGet(discordgo.Message{}); err != nil {
+	if err := db.dbGet(Message{}); err != nil {
 		if err == mgo.ErrNotFound {
 			// Insert the message into the database here.
 			if err := db.dbInsert(); err != nil {

@@ -42,7 +42,6 @@ const (
 type Library struct {
 	Arguments map[string]string // Contains arguments such as -h, -u, -s
 	Args      int
-	ArgHelp   bool
 	ArgAdd    bool
 	ArgEdit   bool
 	ArgDel    bool
@@ -66,12 +65,12 @@ type Script struct {
 }
 
 // Core handles all initial requests.
-func scriptCore(server string, user *discordgo.User, io []string, help bool) (string, error) {
+func scriptCore(server string, user *discordgo.User, io []string) (string, error) {
 	var msg string
 	var err error
 	var lib *Library
 
-	lib, err = New(server, user, io, help)
+	lib, err = New(server, user, io)
 	if err != nil {
 		return "", err
 	}
@@ -88,8 +87,6 @@ func scriptCore(server string, user *discordgo.User, io []string, help bool) (st
 		msg, err = lib.List()
 	case lib.Args&(argUser|argName) == (argUser | argName):
 		msg, err = lib.Get()
-	case lib.ArgHelp:
-		fallthrough
 	default:
 		msg = Help(lib.Flags, "", "")
 	}
@@ -105,12 +102,11 @@ func scriptCore(server string, user *discordgo.User, io []string, help bool) (st
 }
 
 // New creates a new instance of Script.
-func New(database string, user *discordgo.User, io []string, help bool) (*Library, error) {
+func New(database string, user *discordgo.User, io []string) (*Library, error) {
 	tn := time.Now()
 
 	var lib = &Library{
 		Database: database,
-		ArgHelp:  help,
 	}
 
 	err := lib.setArguments(io)
@@ -350,9 +346,6 @@ func (lib *Library) setArguments(io []string) error {
 	lib.Flags.BoolVar(&lib.ArgEdit, "edit", false, "Edit an existing script")
 	lib.Flags.BoolVar(&lib.ArgDel, "del", false, "Delete a script")
 	lib.Flags.BoolVar(&lib.ArgList, "list", false, "List all scripts")
-	if lib.ArgHelp == false {
-		lib.Flags.BoolVar(&lib.ArgHelp, "help", true, "this message")
-	}
 	err := lib.Flags.Parse(io[1:])
 	if err != nil {
 		return err

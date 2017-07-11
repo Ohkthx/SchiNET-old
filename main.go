@@ -12,7 +12,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.4.4"
+	_version       = "0.5.0"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -20,11 +20,32 @@ var (
 	envPBPW        = os.Getenv("BOT_PBPW")
 	envPB          = os.Getenv("BOT_PB")
 	consoleDisable bool
+	cmds           map[string]map[string]string
 )
 
 func init() {
 	flag.BoolVar(&consoleDisable, "console-disable", false, "Disable Console.")
 	flag.Parse()
+
+	// Init commands.
+	cmds = make(map[string]map[string]string)
+	cmds["admin"] = make(map[string]string)
+	cmds["mod"] = make(map[string]string)
+	cmds["normal"] = make(map[string]string)
+
+	cmds["admin"]["permission"] = "Add and Remove permissions for a user."
+	cmds["admin"]["ban"] = "Soft/Hard/Bot ban a user."
+	cmds["admin"]["histo"] = "Prints out server message statistics."
+
+	cmds["mod"]["event"] = "Add/Edit/Remove server events."
+	cmds["mod"]["alias"] = "Add/Remove command aliases."
+
+	cmds["normal"]["script"] = "Add/Edit/Remove scripts for the local server."
+	cmds["normal"]["event"] = "View events that are currently scheduled."
+	cmds["normal"]["user"] = "Displays stastics of a specified user."
+	cmds["normal"]["echo"] = "Echos a message given."
+	cmds["normal"]["roll"] = "How's your luck? Rolls 2 6d"
+	cmds["normal"]["top10"] = "Are you amongst the great?"
 }
 
 // Bot Global interface for pulling discord information.

@@ -1,3 +1,14 @@
+0.5.0 - Additions:
+            - Aliases! The ability to tie commands to other commands.
+            - Global "Help" text.
+            - Using Getopt.v2 package from Pborman for flag parsing now (Supports Long.)
+        Fixes:
+            - Message Logging wasn't updating correctly, resolved.
+            - Proper counting on recently archived messages with "check [server name]"
+            - Gambling/Credit functions moved to user and part of user object.
+            - Permission checking on Histograph.
+            - Rewrote/Modified most of User actions. Reorganized.
+
 0.4.4 - Additions:
             - Events now work with flag parsing like Ban and Script.
             - Histograph of messages for a particular server/guild.

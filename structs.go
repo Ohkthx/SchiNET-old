@@ -29,7 +29,6 @@ type bot struct {
 // IOdat is input/output processed.
 type IOdat struct {
 	//err  error // Tracking errors.
-	help    bool // If HELP is in the input
 	command bool // Flag toggling if it is a command or not.
 	rm      bool // Remove initial message.
 	io      []string
@@ -72,6 +71,7 @@ type User struct {
 	Username      string
 	Discriminator string
 	Access        int
+	Server        string
 	Bot           bool
 	Credits       int
 	CreditsTotal  int
@@ -105,4 +105,12 @@ type UserBasic struct {
 // Command structure for User Defined commands.
 type Command struct {
 	ID bson.ObjectId `bson:"_id,omitempty"`
+}
+
+// Alias contains information regarding an alias link.
+type Alias struct {
+	ID      bson.ObjectId `bson:"_id,omitempty"`
+	Caller  string        // String that calls the alias.
+	Linked  string        // What the real command is.
+	AddedBy *User         // Person who added alias.
 }
