@@ -75,14 +75,13 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		io.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)
 		//return
 	}
-
 	// Prevention from attempting access of null pointer from console.
 	if io.msg != nil && io.rm {
 		s.ChannelMessageDelete(io.msg.ChannelID, io.msg.ID)
 	}
 
 	// Send message here.
-	if len(io.io) > 0 && io.output != "" && io.msgEmbed == nil {
+	if io.output != "" {
 		_, _ = s.ChannelMessageSend(m.ChannelID, io.output)
 	} else if io.msgEmbed != nil {
 		s.ChannelMessageSendEmbed(m.ChannelID, io.msgEmbed)
@@ -223,7 +222,7 @@ func MessageNew(database, channel string, m *discordgo.Message) *Message {
 		Content:         m.Content,
 		Timestamp:       ts,
 		EditedTimestamp: ets,
-		Author:          u,
+		Author:          u.Basic(),
 		AuthorMsg:       u.CreditsTotal,
 	}
 }

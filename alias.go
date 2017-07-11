@@ -7,8 +7,6 @@ import (
 
 	getopt "github.com/pborman/getopt/v2"
 
-	"bytes"
-
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -28,9 +26,9 @@ var (
 
 // Syntax constants for Alias Commands.
 const (
-	aliasSyntaxAdd    = ",alias   -add      -i ub   -o \"user -ban\"\n"
-	aliasSyntaxRemove = ",alias   -remove   -i ub\n"
-	aliasSyntaxList   = ",alias   -list\n"
+	aliasSyntaxAdd    = ",alias   --add      -i ub   -o \"user -ban\"\n"
+	aliasSyntaxRemove = ",alias   --remove   -i ub\n"
+	aliasSyntaxList   = ",alias   --list\n"
 	aliasSyntaxAll    = "\n\n" + aliasSyntaxAdd + aliasSyntaxRemove + aliasSyntaxList
 )
 
@@ -49,9 +47,13 @@ func (io *IOdat) CoreAlias() error {
 	fl.Flag(&caller, 'i', "Input (Alias) text")
 	fl.Flag(&linked, 'o', "Original (What it is referring to)")
 
-	fl.Parse(io.io)
+	if err := fl.Getopt(io.io, nil); err != nil {
+		return err
+	}
 	if fl.NArgs() > 0 {
-		fl.Parse(fl.Args())
+		if err := fl.Getopt(fl.Args(), nil); err != nil {
+			return err
+		}
 	}
 
 	if u.Access < permModerator {
@@ -93,9 +95,7 @@ func (io *IOdat) CoreAlias() error {
 		return nil
 	}
 
-	buf := new(bytes.Buffer)
-	fl.PrintUsage(buf)
-	io.output = "```" + buf.String() + aliasSyntaxAll + "```"
+	io.output = Help(fl, "", aliasSyntaxAll)
 	return nil
 }
 
@@ -104,7 +104,7 @@ func AliasNew(caller, link string, user *User) *Alias {
 	return &Alias{
 		Caller:  caller,
 		Linked:  link,
-		AddedBy: user,
+		AddedBy: user.Basic(),
 	}
 }
 

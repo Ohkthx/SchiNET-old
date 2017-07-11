@@ -110,7 +110,6 @@ func usernameSplit(username string) []string {
 }
 
 func (cfg *Config) ioHandler(io *IOdat) (err error) {
-	var s string
 	if len(io.io) < 1 {
 		// Not enough arguments to do anything.
 		// Prevents accessing nil pointer.
@@ -125,7 +124,6 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 			return err
 		}
 	} else {
-		fmt.Println("Alias found:", link)
 		io.io = aliasConv(io.io[0], link, io.input)
 	}
 
@@ -144,12 +142,11 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 	case "histo":
 		err = io.histograph(cfg.Core.Session, io.guild.Name)
 	case "event", "events":
-		fallthrough
-	case "add", "del", "edit":
-		err = io.dbCore()
+		err = io.CoreEvent()
+	case "cmd", "command":
+		err = io.CoreDatabase()
 	case "script", "scripts":
-		s, err = scriptCore(io.guild.Name, io.msg.Author, io.io)
-		io.msgEmbed = embedCreator(s, ColorGreen)
+		err = io.CoreLibrary()
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return

@@ -12,7 +12,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.5.0"
+	_version       = "0.5.1"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -90,10 +90,12 @@ func main() {
 		}
 	}
 
-	//binfo.Core = bot
 	Bot = bot
-
 	Mgo = cfg.DB
+	if err := cfg.defaultAliases(); err != nil {
+		fmt.Println(err)
+		os.Exit(0)
+	}
 
 	if !consoleDisable {
 		cfg.core()
@@ -107,4 +109,30 @@ func (cfg *Config) cleanup() {
 	cfg.DB.Close()
 	fmt.Println("Bot stopped, exiting.")
 	os.Exit(0)
+}
+
+// Used to verify/register default aliases.
+func (cfg *Config) defaultAliases() error {
+
+	type aliasSimple struct {
+		caller string
+		linked string
+	}
+
+	var aliases [4]aliasSimple
+	aliases[0] = aliasSimple{"gamble", "user --gamble -n"}
+	aliases[1] = aliasSimple{"ban", "user --ban"}
+	aliases[2] = aliasSimple{"permission", "user --permission"}
+	aliases[3] = aliasSimple{"xfer", "user --xfer "}
+
+	for _, g := range cfg.Core.Guilds {
+		for _, a := range aliases {
+			user := UserNew(g.Name, cfg.Core.User)
+			alias := AliasNew(a.caller, a.linked, user)
+			if err := alias.Update(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

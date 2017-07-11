@@ -179,32 +179,11 @@ func (d *DBdat) dbGetAll(i interface{}) error {
 	return nil
 }
 
-func (io *IOdat) dbCore() (err error) {
-	var s string
-	if len(io.io) > 1 {
-		switch strings.ToLower(io.io[1]) {
-		case "script", "scripts":
-			s, err = scriptCore(io.guild.Name, io.msg.Author, io.io)
-			io.msgEmbed = embedCreator(s, ColorGreen)
-		}
-	}
-
-	if err != nil {
-		return err
-	} else if io.msgEmbed != nil {
-		return nil
-	}
+// CoreDatabase will control adding and removing user defined commands.
+func (io *IOdat) CoreDatabase() (err error) {
 
 	switch io.io[0] {
-	case "event", "events":
-		msg, err := io.Events(io.guild.Name, io.user.ID, io.io)
-		if msg != "" {
-			io.msgEmbed = embedCreator(msg, ColorBlue)
-		}
-		return err
 	case "add":
-		dbdat := DBdatCreate(io.guild.Name, "commands", Command{}, nil, nil)
-		err = dbdat.dbInsert()
 	case "edit":
 	case "del":
 	}
@@ -215,6 +194,10 @@ func (io *IOdat) dbCore() (err error) {
 func handlerForInterface(handler interface{}, i interface{}) (interface{}, error) {
 	byt, _ := bson.Marshal(i)
 	switch handler.(type) {
+	case Alias:
+		var a Alias
+		bson.Unmarshal(byt, &a)
+		return a, nil
 	case Event:
 		var e Event
 		bson.Unmarshal(byt, &e)
@@ -235,10 +218,6 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var m Message
 		bson.Unmarshal(byt, &m)
 		return m, nil
-	case Alias:
-		var a Alias
-		bson.Unmarshal(byt, &a)
-		return a, nil
 	default:
 		return nil, ErrBadInterface
 	}

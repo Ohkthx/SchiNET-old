@@ -2,12 +2,12 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pborman/getopt/v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -21,89 +21,111 @@ var (
 
 // Constants for producing helpful text for normal command operations.
 const (
-	eventSyntaxAdd  = ",event   -add   -d \"Weekday\"   -t \"Time\"   -c \"Comment\"\n"
-	eventSyntaxDel  = ",event   -d \"Weekday\"   -t \"Time\"   -remove\n"
-	eventSyntaxEdit = ",event   -edit   -d \"Weekday\"   -t \"Time\"   -c \"Comment\"\n"
+	eventSyntaxAdd  = ",event   --add   --day \"Weekday\"   -t \"Time\"   -c \"Comment\"\n"
+	eventSyntaxDel  = ",event   --day \"Weekday\"   -t \"Time\"   --remove\n"
+	eventSyntaxEdit = ",event   --edit   --day \"Weekday\"   -t \"Time\"   -c \"Comment\"\n"
 	eventSyntaxAll  = eventSyntaxAdd + eventSyntaxEdit + eventSyntaxDel
 )
 
-// Events handles all event related commands from input.
-func (io *IOdat) Events(database, id string, command []string) (string, error) {
+// CoreEvent handles all event related commands from input.
+func (io *IOdat) CoreEvent() error {
 	var add, del, edit, persist, help, list bool
 	var comment, day, time string
-	fl := flag.NewFlagSet("event", flag.ContinueOnError)
-	fl.BoolVar(&add, "add", false, "Add an Event")
-	fl.BoolVar(&edit, "edit", false, "Edit an Event")
-	fl.BoolVar(&del, "remove", false, "Delete an Event")
-	fl.BoolVar(&persist, "persist", false, "Reoccuring Event")
-	fl.BoolVar(&help, "help", false, "Prints this")
-	fl.BoolVar(&list, "list", false, "List all Events")
-	fl.StringVar(&day, "d", "", "Weekday of Event")
-	fl.StringVar(&time, "t", "12:00", "Time Occuring [12:00 default]")
-	fl.StringVar(&comment, "c", "", "Event Information/Comment")
-	if err := fl.Parse(command[1:]); err != nil {
-		return "", err
+	time = "12:00"
+
+	fl := getopt.New()
+
+	fl.FlagLong(&add, "add", 0, "Add an Event")
+	fl.FlagLong(&edit, "edit", 0, "Edit an Event")
+	fl.FlagLong(&del, "remove", 0, "Delete an Event")
+	fl.FlagLong(&persist, "persist", 'p', "Reoccuring Event")
+	fl.FlagLong(&help, "help", 'h', "Prints this")
+	fl.FlagLong(&list, "list", 'l', "List all Events")
+	fl.FlagLong(&day, "day", 'd', "Weekday of Event")
+	fl.FlagLong(&time, "time", 't', "Time Occuring [12:00 default]")
+	fl.FlagLong(&comment, "comment", 'c', "Event Information/Comment")
+
+	if err := fl.Getopt(io.io, nil); err != nil {
+		return err
+	}
+	if fl.NArgs() > 0 {
+		if err := fl.Getopt(fl.Args(), nil); err != nil {
+			return err
+		}
 	}
 
 	if help {
 		prefix := "**Need** __command__,  __day__.\n\n"
 		suffix := "\n\nExamples:\n" + eventSyntaxAll
-		return Help(fl, prefix, suffix), nil
+		io.output = Help(fl, prefix, suffix)
+		return nil
 	} else if list {
-		return "", io.GetEvents()
+		ev := EventNew("", "", "", io.user, false)
+		msg, err := ev.List()
+		if err != nil {
+			return err
+		}
+		io.output = msg
+		return nil
 	}
 
 	if (add || edit || del) && day != "" {
 		if ok := io.user.HasPermission(permAdmin); !ok {
-			return "", ErrBadPermissions
+			return ErrBadPermissions
 		}
-		ev, err := EventNew(comment, day, time, io.user, persist)
-		if err != nil {
-			return "", err
-		}
+		ev := EventNew(comment, day, time, io.user, persist)
 
+		var err error
+		var msg string
 		switch {
 		case add:
-			return ev.Add(database)
+			msg, err = ev.Add()
 		case edit:
-			return ev.Edit(database)
+			msg, err = ev.Edit()
 		case del:
-			return ev.Delete(database)
+			msg, err = ev.Delete()
+		}
+		if err != nil {
+			return err
+		} else if msg != "" {
+			io.msgEmbed = embedCreator(msg, ColorGreen)
 		}
 	}
 
-	return "", io.GetEvents()
+	ev := EventNew("", "", "", io.user, false)
+	msg, err := ev.List()
+	if err != nil {
+		return err
+	}
+	io.output = msg
+	return nil
+
 }
 
 // EventNew creates a new Event object that can be acted on.
-func EventNew(desc, day, t string, u *User, persist bool) (*Event, error) {
+func EventNew(desc, day, t string, u *User, persist bool) *Event {
 
-	da, err := evDayAdd(day)
-	if err != nil {
-		return nil, err
-	}
-	hhmm, err := evHHMM(t)
-	if err != nil {
-		return nil, err
-	}
+	da, _ := evDayAdd(day)
+	hhmm, _ := evHHMM(t)
 
 	now := time.Now()
 	ts := time.Date(now.Year(), now.Month(), now.Day()+da, hhmm[0], hhmm[1], 0, 0, now.Location())
 
 	return &Event{
+		Server:      u.Server,
 		Description: desc,
 		Day:         day,
 		HHMM:        t,
 		Time:        ts,
 		Protected:   persist,
-		AddedBy:     u,
-	}, nil
+		AddedBy:     u.Basic(),
+	}
 }
 
 // Add stores an Event in the Database.
-func (ev *Event) Add(database string) (string, error) {
+func (ev *Event) Add() (string, error) {
 
-	dbdat := DBdatCreate(database, CollectionEvents, ev, nil, nil)
+	dbdat := DBdatCreate(ev.Server, CollectionEvents, ev, nil, nil)
 	if err := dbdat.dbInsert(); err != nil {
 		return "", err
 	}
@@ -114,17 +136,17 @@ func (ev *Event) Add(database string) (string, error) {
 }
 
 // Edit modifies an event inside the database.
-func (ev *Event) Edit(database string) (string, error) {
+func (ev *Event) Edit() (string, error) {
 	return "Command not functional yet.", nil
 }
 
 // Delete removes an event from the database.
-func (ev *Event) Delete(database string) (string, error) {
+func (ev *Event) Delete() (string, error) {
 
 	var q = make(map[string]interface{})
 
 	q["$and"] = []bson.M{bson.M{"day": ev.Day}, bson.M{"time": ev.Time}}
-	var dbdat = DBdatCreate(database, CollectionEvents, Event{}, q, nil)
+	var dbdat = DBdatCreate(ev.Server, CollectionEvents, Event{}, q, nil)
 	if err := dbdat.dbGet(Event{}); err != nil {
 		if err == mgo.ErrNotFound {
 			return "", fmt.Errorf("event not found: %s -> %s", ev.Day, ev.HHMM)
@@ -142,19 +164,18 @@ func (ev *Event) Delete(database string) (string, error) {
 	return msg, nil
 }
 
-// GetEvents for the local server.
-func (io *IOdat) GetEvents() error {
+// List events for the local server.
+func (ev *Event) List() (string, error) {
 	var events []string
 	var msg string
 	var err error
 	var t = time.Now()
 
-	dbdat := DBdatCreate(io.guild.Name, CollectionEvents, nil, nil, nil)
+	dbdat := DBdatCreate(ev.Server, CollectionEvents, nil, nil, nil)
 	dbdat.dbGetAll(Event{})
 
 	if len(dbdat.Documents) == 0 {
-		io.msgEmbed = embedCreator("No events found", ColorMaroon)
-		return nil
+		return "", errors.New("no events scheduled for this server")
 	}
 
 	msg = "Upcoming Events:```C\n"
@@ -164,9 +185,9 @@ func (io *IOdat) GetEvents() error {
 		hours := int(dur.Hours())
 
 		if hours < -12 && ev.Protected {
-			ev.Time, err = io.evTime(io.io[3], true)
+			ev.Time, err = evTime(ev.Day, ev.HHMM, true)
 			if err != nil {
-				return err
+				return "", err
 			}
 			dur = ev.Time.Sub(t)
 			hours = int(dur.Hours())
@@ -175,17 +196,17 @@ func (io *IOdat) GetEvents() error {
 			var c = q
 			q["_id"] = ev.ID
 			c["$set"] = bson.M{"time": ev.Time}
-			var dbdat = DBdatCreate(io.guild.Name, CollectionEvents, ev, q, c)
+			var dbdat = DBdatCreate(ev.Server, CollectionEvents, ev, q, c)
 			err = dbdat.dbEdit(Event{})
 			if err != nil {
-				return err
+				return "", err
 			}
 
 		} else if hours < -12 {
 			// Delete from Database here.
 			err := dbdat.dbDeleteID(ev.ID)
 			if err != nil {
-				return err
+				return "", err
 			}
 			continue
 		}
@@ -208,12 +229,11 @@ func (io *IOdat) GetEvents() error {
 		msg += fmt.Sprintf("\n[%d] -> %s", n, e)
 	}
 	msg += "```"
-	//io.output = msg
-	io.msgEmbed = embedCreator(msg, ColorBlue)
 
-	return nil
+	return msg, nil
 }
 
+// Converts a weekday to a number.
 func evDayAdd(wd string) (int, error) {
 	var num, alt, dayAdd int
 	now := time.Now()
@@ -249,6 +269,7 @@ func evDayAdd(wd string) (int, error) {
 	return dayAdd, nil
 }
 
+// Converts a time string.
 func evHHMM(hhmms string) ([2]int, error) {
 	var hm [2]int
 	var err error
@@ -266,7 +287,7 @@ func evHHMM(hhmms string) ([2]int, error) {
 	return hm, nil
 }
 
-func (io *IOdat) evTime(hhmms string, rollover bool) (time.Time, error) {
+func evTime(wd, hhmms string, rollover bool) (time.Time, error) {
 	t := time.Now()
 	var da int
 	var err error
@@ -274,7 +295,7 @@ func (io *IOdat) evTime(hhmms string, rollover bool) (time.Time, error) {
 	if rollover {
 		da = 7
 	} else {
-		da, err = evDayAdd(io.io[2])
+		da, err = evDayAdd(wd)
 		if err != nil {
 			return t, err
 		}

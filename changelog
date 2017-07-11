@@ -1,3 +1,16 @@
+0.5.1 - Additions:
+            - Adding script library now happens by file attachments.
+            - Auto-assigns several "default" aliases.
+            - Additional example syntaxes added.
+            - User.Basic() function to convert User -> UserBasic type.
+        Fixes:
+            - Parsing commands (flags) no longer os.Exit() (Parse() built-in)
+            - Converted Events to use Getopts.
+            - Rewrite of Events.
+            - Rewrite of Library/Script
+            - Help() now acts on Getopt versus Flag to display help messages.
+            - dbCore() renamed to CoreDatabase() to match other cores.
+
 0.5.0 - Additions:
             - Aliases! The ability to tie commands to other commands.
             - Global "Help" text.

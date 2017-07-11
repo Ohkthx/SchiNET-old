@@ -3,11 +3,16 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
-	"flag"
+	"strings"
+
+	"bytes"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/pborman/getopt/v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -21,10 +26,11 @@ var (
 )
 
 const (
-	scriptSyntaxGet  = ",script  -user \"Username\"   -name \"Name Here\""
-	scriptSyntaxAdd  = ",script  -add   -name \"Name Here\"   -script \"Text goes here\""
-	scriptSyntaxEdit = ",script  -edit   -name \"Name Here\"   -script \"Text goes here\""
-	scriptSyntaxDel  = ",script  -del   -name \"Name Here\""
+	scriptSyntaxGet  = ",script  --get      --user \"Username\"   --title \"Name Here\"\n"
+	scriptSyntaxAdd  = ",script  --add      --title \"Name Here\"   [Attach .txt File]\n"
+	scriptSyntaxEdit = ",script  --edit     --title \"Name Here\"   [Attach .txt File]\n"
+	scriptSyntaxDel  = ",script  --remove   --title \"Name Here\"\n"
+	scriptSyntaxAll  = "\n\n" + scriptSyntaxAdd + scriptSyntaxEdit + scriptSyntaxDel + scriptSyntaxGet
 
 	collectionName = "scripts"
 
@@ -40,22 +46,17 @@ const (
 
 // Library holds session data for accessing the information.
 type Library struct {
-	Arguments map[string]string // Contains arguments such as -h, -u, -s
-	Args      int
-	ArgAdd    bool
-	ArgEdit   bool
-	ArgDel    bool
-	ArgList   bool
-	Database  string // Database to store information on.
-	Flags     *flag.FlagSet
-	Script    *Script
+	Database    string // Database to store information on.
+	Attachments []*discordgo.MessageAttachment
+	Flags       *getopt.Set
+	Script      *Script
 }
 
 // Script contains information pretaining to a specific script from a database.
 type Script struct {
 	ID           bson.ObjectId `bson:"_id,omitempty"`
 	Name         string
-	Author       *discordgo.User
+	Author       UserBasic
 	Content      string
 	Length       int
 	URL          string
@@ -64,81 +65,95 @@ type Script struct {
 	DateAccessed time.Time
 }
 
-// Core handles all initial requests.
-func scriptCore(server string, user *discordgo.User, io []string) (string, error) {
-	var msg string
+// CoreLibrary handles all script/library requests.
+func (io *IOdat) CoreLibrary() error {
 	var err error
-	var lib *Library
+	var msg string
 
-	lib, err = New(server, user, io)
-	if err != nil {
-		return "", err
+	var add, edit, remove, get, list, help bool
+	var user, name string
+
+	lib := LibraryNew(io.guild.Name, io.msg.Attachments)
+
+	fl := getopt.New()
+
+	fl.FlagLong(&add, "add", 0, "Add a script")
+	fl.FlagLong(&edit, "edit", 0, "Edit a script")
+	fl.FlagLong(&remove, "remove", 0, "Remove a script")
+	fl.FlagLong(&get, "get", 'g', "Get a script")
+	fl.FlagLong(&user, "user", 0, "Script Owner")
+	fl.FlagLong(&name, "title", 't', "Title of script")
+	fl.FlagLong(&list, "list", 'l', "List all script in Library")
+	fl.FlagLong(&help, "help", 'h', "Help")
+
+	if err := fl.Getopt(io.io, nil); err != nil {
+		return err
+	}
+	if fl.NArgs() > 0 {
+		if err := fl.Getopt(fl.Args(), nil); err != nil {
+			return err
+		}
 	}
 
-	switch {
-	case lib.ArgAdd, lib.ArgEdit:
-		// Add script in Database,
+	lib.Script = ScriptNew(name, "", io.user.Basic())
+
+	if (add || edit) && name != "" {
 		msg, err = lib.Add()
-	case lib.ArgDel && lib.Args&argName == argName:
+	} else if remove && name != "" {
 		// Delete script in Database.
 		msg, err = lib.Delete()
-	case lib.ArgList:
-		// Get script from Database.
-		msg, err = lib.List()
-	case lib.Args&(argUser|argName) == (argUser | argName):
+	} else if get && name != "" && user != "" {
 		msg, err = lib.Get()
-	default:
-		msg = Help(lib.Flags, "", "")
+	} else if list {
+		// List scripts in Database.
+		io.output, err = lib.List()
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if err != nil {
-		return "", err
+		return err
+	} else if msg != "" {
+		io.msgEmbed = embedCreator(msg, ColorGreen)
+		return nil
 	}
 
-	// Embeded object here? Or return msg.
-	//io.msgEmbed = embedCreator(msg, ColorGreen)
+	io.output = Help(fl, "", scriptSyntaxAll)
 
-	return msg, nil
+	return nil
 }
 
-// New creates a new instance of Script.
-func New(database string, user *discordgo.User, io []string) (*Library, error) {
-	tn := time.Now()
-
+// LibraryNew creates a new instance of Script.
+func LibraryNew(database string, attachs []*discordgo.MessageAttachment) *Library {
 	var lib = &Library{
-		Database: database,
+		Database:    database,
+		Attachments: attachs,
 	}
 
-	err := lib.setArguments(io)
-	if err != nil {
-		return nil, err
-	}
-
-	var script = &Script{
-		Name:         lib.Arguments["name"],
-		Author:       user,
-		Content:      lib.Arguments["script"],
-		Length:       len(lib.Arguments["script"]),
-		DateAdded:    tn,
-		DateModified: tn,
-		DateAccessed: tn,
-	}
-
-	lib.Script = script
-
-	return lib, nil
+	return lib
 }
 
 // Add a script to the library.
 func (lib *Library) Add() (string, error) {
 	var err error
 
-	if lib.Args&(argName|argScript) != (argName | argScript) {
-		if lib.ArgAdd {
-			return scriptSyntaxAdd, nil
-		}
-		return scriptSyntaxEdit, nil
+	// Check if attachment is good.
+	if len(lib.Attachments) != 1 {
+		return "", errors.New("need to provide ONE and only ONE attachment")
+	} else if strings.HasSuffix(lib.Attachments[0].Filename, ".txt") == false {
+		return "", errors.New("bad file extension for uploaded script, want: .txt")
 	}
+
+	attach := lib.Attachments[0]
+
+	txt, err := getFile(attach.Filename, attach.URL)
+	if err != nil {
+		return "", err
+	}
+	lib.Script.Content = txt
+	lib.Script.Length = len(txt)
 
 	s, err := lib.find(false)
 	if err != nil {
@@ -163,11 +178,9 @@ func (lib *Library) Add() (string, error) {
 		return "", err
 	}
 
-	if lib.ArgEdit {
-		return lib.Edit(s)
-	}
-
-	return "already exists, try editing.", nil
+	s.Content = txt
+	s.Length = len(txt)
+	return lib.Edit(s)
 }
 
 // Edit a script in the library.
@@ -177,7 +190,7 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 	var q = make(map[string]interface{})
 	var c = make(map[string]interface{})
 
-	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.username": s.Author.Username}}
+	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
 
 	tn := time.Now()
 	// Get URL of New Paste.
@@ -205,7 +218,6 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 		return "", err
 	}
 
-	uA := usernameAdd(s.Author.Username, s.Author.Discriminator)
 	msg := fmt.Sprintf(
 		"__**%s** edited **%s**__"+
 			"**Added by**: %s\n"+
@@ -213,11 +225,11 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 			"**Date Modified**: %s\n\n"+
 			"**URL**: [%s](%s) by %s\n"+
 			"**(Script will only be avaible for __10 minutes__.)*",
-		uA, s.Name,
-		uA,
+		s.Author.String(), s.Name,
+		s.Author.String(),
 		s.DateAdded.Format(time.UnixDate),
 		s.DateModified.Format(time.UnixDate),
-		s.Name, s.URL, uA,
+		s.Name, s.URL, s.Author.String(),
 	)
 
 	return msg, nil
@@ -226,22 +238,18 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 // Delete a script from a library.
 func (lib *Library) Delete() (string, error) {
 
-	if lib.Args&argName != argName {
-		return scriptSyntaxDel, nil
-	}
-
 	s := lib.Script
 	var err error
 	var q = make(map[string]interface{})
 
-	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.username": s.Author.Username}}
+	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
 	dbdat := DBdatCreate(lib.Database, CollectionScripts, lib.Script, q, nil)
 	err = dbdat.dbDelete()
 	if err != nil {
 		return "", err
 	}
 
-	msg := fmt.Sprintf("**%s** deleted -> **%s**\n  It will be missed...", s.Author.Username, lib.Script.Name)
+	msg := fmt.Sprintf("**%s** deleted -> **%s**\n  It will be missed...", s.Author.Name, lib.Script.Name)
 	return msg, nil
 }
 
@@ -249,12 +257,7 @@ func (lib *Library) find(requested bool) (*Script, error) {
 	s := lib.Script
 	var q = make(map[string]interface{})
 
-	user := lib.Arguments["user"]
-	if user == "" {
-		user = s.Author.Username
-	}
-
-	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.username": user}}
+	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
 
 	dbdat := DBdatCreate(lib.Database, CollectionScripts, Script{}, q, nil)
 	err := dbdat.dbGet(Script{})
@@ -296,7 +299,6 @@ func (lib *Library) Get() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return s.String(), nil
 
 }
@@ -323,75 +325,14 @@ func (lib *Library) List() (string, error) {
 	var msg = "Current Scripts in Library:\n\n"
 	for n, d := range docs {
 		found = true
-		msg += fmt.Sprintf("  [%d] %s -> %s\n", n, d.Author.Username, d.Name)
+		msg += fmt.Sprintf("  [%d] %s -> %s\n", n, d.Author.Name, d.Name)
 	}
 	if !found {
 		msg += "No scripts found in library.\n"
 	}
 	msg += fmt.Sprintf("\nTo request a script, type:\n%s", scriptSyntaxGet)
 
-	return msg, nil
-}
-
-// setArguments assists in initiating the library.
-func (lib *Library) setArguments(io []string) error {
-	lib.Arguments = make(map[string]string)
-	var user, name, script string
-
-	lib.Flags = flag.NewFlagSet("script", flag.ContinueOnError)
-	lib.Flags.StringVar(&user, "user", "", "Username")
-	lib.Flags.StringVar(&name, "name", "", "Script name")
-	lib.Flags.StringVar(&script, "script", "", "Script text")
-	lib.Flags.BoolVar(&lib.ArgAdd, "add", false, "Add a new script")
-	lib.Flags.BoolVar(&lib.ArgEdit, "edit", false, "Edit an existing script")
-	lib.Flags.BoolVar(&lib.ArgDel, "del", false, "Delete a script")
-	lib.Flags.BoolVar(&lib.ArgList, "list", false, "List all scripts")
-	err := lib.Flags.Parse(io[1:])
-	if err != nil {
-		return err
-	}
-
-	lib.Arguments["user"] = user
-	lib.Arguments["name"] = name
-	lib.Arguments["script"] = script
-
-	if user != "" {
-		lib.Args |= argUser
-	}
-
-	if name != "" {
-		lib.Args |= argName
-	}
-
-	if script != "" {
-		lib.Args |= argScript
-	}
-
-	return nil
-}
-
-// Print returns a string of information about a script.
-func (s *Script) String() string {
-	if s == nil {
-		return "script information could not be obtained."
-	}
-
-	var uA = usernameAdd(s.Author.Username, s.Author.Discriminator)
-
-	msg := fmt.Sprintf(
-		"__Script Name: %s__\n\n"+
-			"**Added by**: %s\n"+
-			"**Date Added**: %s\n"+
-			"**Date Modified**: %s\n\n"+
-			"**URL**: [%s](%s) by %s\n"+
-			"**(Script will only be avaible for __10 minutes__.)*",
-		s.Name,
-		uA,
-		s.DateAdded.Format(time.UnixDate),
-		s.DateModified.Format(time.UnixDate),
-		s.Name, s.URL, uA,
-	)
-	return msg
+	return "```" + msg + "```", nil
 }
 
 // SetAccessed updates database with new timestamp.
@@ -400,7 +341,7 @@ func (lib *Library) setAccessed() error {
 	var q = make(map[string]interface{})
 	var c = make(map[string]interface{})
 
-	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.username": s.Author.Username}}
+	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
 
 	c["$set"] = bson.M{
 		"url":          s.URL,
@@ -414,4 +355,56 @@ func (lib *Library) setAccessed() error {
 	}
 
 	return nil
+}
+
+// ScriptNew creates a new script object.
+func ScriptNew(name, content string, author UserBasic) *Script {
+	tn := time.Now()
+	return &Script{
+		Name:         name,
+		Author:       author,
+		Content:      content,
+		Length:       len(content),
+		DateAdded:    tn,
+		DateModified: tn,
+		DateAccessed: tn,
+	}
+}
+
+// Print returns a string of information about a script.
+func (s *Script) String() string {
+	if s == nil {
+		return "script information could not be obtained."
+	}
+
+	msg := fmt.Sprintf(
+		"__Script Name: %s__\n\n"+
+			"**Added by**: %s\n"+
+			"**Date Added**: %s\n"+
+			"**Date Modified**: %s\n\n"+
+			"**URL**: [%s](%s) by %s\n"+
+			"**(Script will only be avaible for __10 minutes__.)*",
+		s.Name,
+		s.Author.String(),
+		s.DateAdded.Format(time.UnixDate),
+		s.DateModified.Format(time.UnixDate),
+		s.Name, s.URL, s.Author.String(),
+	)
+	return msg
+}
+
+func getFile(filename, url string) (string, error) {
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var buf = new(bytes.Buffer)
+	if _, err := io.Copy(buf, resp.Body); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

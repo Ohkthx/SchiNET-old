@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -18,8 +17,7 @@ import (
 
 // Flags that can be parsed related to User commands.
 type userFlags struct {
-	flag     *getopt.Set // FlagSet object -> used for Help
-	flagHelp string
+	flag *getopt.Set // FlagSet object -> used for Help
 	// Generics
 	User    string // User to perform action on.
 	Comment string // Comment for action.
@@ -47,12 +45,22 @@ var (
 	ErrBadPermissions = errors.New("you do not have permissions to do that")
 	ErrBanChanExists  = errors.New("user already has a ban for that channel")
 	ErrBanNotFound    = errors.New("ban not found to clear")
-	banSyntaxHard     = ",ban  -type hard -user \"Username\"\n"
-	banSyntaxSoft     = ",ban  -type soft  -user \"Username\"   -c \"Bug Exploits\"\n"
-	banSyntaxRemove   = ",ban  -type hard   -user \"Username\"   -remove\n"
-	permSyntaxAdd     = ",permission   -add    -type \"Permission\"   -user \"Username\"\n"
-	permSyntaxRemove  = ",permission   -remove    -type \"Permission\"   -user \"Username\"\n"
-	permSyntaxAll     = permSyntaxAdd + permSyntaxRemove
+
+	banSyntaxHard   = ",ban  --type hard  --user \"@Username\"\n"
+	banSyntaxSoft   = ",ban  --type soft  --user \"@Username\"   -c \"Bug Exploits\"\n"
+	banSyntaxRemove = ",ban  --type hard  --user \"@Username\"   --remove\n"
+	banSyntaxAll    = banSyntaxHard + banSyntaxSoft + banSyntaxRemove
+
+	permSyntaxAdd    = ",permission   --add       --type \"Permission\"   --user \"@Username\"\n"
+	permSyntaxRemove = ",permission   --remove    --type \"Permission\"   --user \"@Username\"\n"
+	permSyntaxAll    = "\n\n" + permSyntaxAdd + permSyntaxRemove
+
+	userSyntaxUser       = ",user   --user \"@Username\"\n"
+	userSyntaxGamble     = ",user   --gamble   -n 100\n"
+	userSyntaxBan        = ",user   --ban   --type soft   --user \"@Username\"\n"
+	userSyntaxXfer       = ",user   -x   --user \"@Username\"   -n 100\n"
+	userSyntaxPermission = ",user   --permission   --add   --type \"mod\"   --user \"@Username\"\n"
+	userSyntaxAll        = "\n\n" + userSyntaxUser + userSyntaxBan + userSyntaxGamble + userSyntaxPermission + userSyntaxXfer
 )
 
 // Permission scheme constants.
@@ -92,15 +100,16 @@ func (io *IOdat) CoreUser() error {
 	// Permission related.
 	fl.FlagLong(&uflags.Permission, "permission", 'p', "Permission Modification")
 
-	fl.Parse(io.io)
+	if err := fl.Getopt(io.io, nil); err != nil {
+		return err
+	}
 	if fl.NArgs() > 0 {
-		fl.Parse(fl.Args())
+		if err := fl.Getopt(fl.Args(), nil); err != nil {
+			return err
+		}
 	}
 
-	buf := new(bytes.Buffer)
-	fl.PrintUsage(buf)
 	uflags.flag = fl
-	uflags.flagHelp = buf.String()
 	uflags.User = userIDClean(uflags.User)
 
 	var msg string
@@ -116,7 +125,7 @@ func (io *IOdat) CoreUser() error {
 		msg, err = u.Permission(uflags)
 	default:
 		if uflags.Help {
-			io.output = uflags.flagHelp
+			io.output = Help(fl, "", userSyntaxAll)
 			return nil
 		} else if uflags.User != "" {
 			// Get user information
@@ -289,6 +298,26 @@ func (u *User) StringPretty() string {
 	return "**" + u.Username + "**#" + u.Discriminator
 }
 
+// Basic provides a basic User structure.
+func (u *User) Basic() UserBasic {
+	return UserBasic{
+		ID:            u.ID,
+		Server:        u.Server,
+		Name:          u.Username,
+		Discriminator: u.Discriminator,
+	}
+}
+
+// String returns a basic string of the object.
+func (ub UserBasic) String() string {
+	return ub.Name + "#" + ub.Discriminator
+}
+
+// StringPretty makes everything prettier.
+func (ub UserBasic) StringPretty() string {
+	return "**" + ub.Name + "**#" + ub.Discriminator
+}
+
 /*
 	BAN RELATED
 	ACTIONS
@@ -318,8 +347,7 @@ func (u *User) Ban(cID string, fl userFlags) (string, error) {
 		return "", ErrBadPermissions
 	} else if fl.Help {
 		prefix := "**Need** __type__ and __username__.\n\n"
-		suffix := "\n\nExamples:\n" + banSyntaxHard + banSyntaxSoft + banSyntaxRemove
-		return fmt.Sprintf("%s%s%s", prefix, fl.flagHelp, suffix), nil
+		return Help(fl.flag, prefix, banSyntaxAll), nil
 	} else if fl.List {
 		return banList(u.Server)
 	}
@@ -374,8 +402,7 @@ func (u *User) Ban(cID string, fl userFlags) (string, error) {
 
 	} else {
 		prefix := "**Need** __type__ and __username__.\n\n"
-		suffix := "\n\nExamples:\n" + banSyntaxHard + banSyntaxSoft + banSyntaxRemove
-		return fmt.Sprintf("%s%s%s", prefix, fl.flagHelp, suffix), nil
+		return Help(fl.flag, prefix, banSyntaxAll), nil
 	}
 
 	return msg, nil
@@ -738,8 +765,7 @@ func (u *User) Permission(fl userFlags) (string, error) {
 	} else if fl.Help {
 		// Print Help + Syntax
 		pre := "Requires an Action and an @User\n\n"
-		suf := "\n" + permSyntaxAll
-		return fmt.Sprintf("%s%s%s", pre, fl.flagHelp, suf), nil
+		return Help(fl.flag, pre, permSyntaxAll), nil
 	} else if fl.List {
 		// List users with non-default permissions.
 		return "Listing hasn't been added yet.", nil
@@ -779,9 +805,8 @@ func (u *User) Permission(fl userFlags) (string, error) {
 		}
 	} else {
 		pre := "Requires an Action and an @User\n\n"
-		suf := "\n" + permSyntaxAll
 		// Print Help here.
-		return fmt.Sprintf("%s%s%s", pre, fl.flagHelp, suf), nil
+		return Help(fl.flag, pre, permSyntaxAll), nil
 	}
 	// Return result/text and nil error.
 	return msg, nil

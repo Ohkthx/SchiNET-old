@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/go_pastebin"
+	"github.com/pborman/getopt/v2"
 )
 
 // Error constants for misc functions.
@@ -34,8 +35,7 @@ func (io *IOdat) miscRoll() {
 	roll1 = r.Intn(6) + 1
 	roll2 = r.Intn(6) + 1
 
-	msg := fmt.Sprintf("*%s rolls %d, %d*", io.user.Username, roll1, roll2)
-	io.msgEmbed = embedCreator(msg, ColorBlue)
+	msg := fmt.Sprintf("```*%s rolls %d, %d*```", io.user.Username, roll1, roll2)
 
 	io.rm = true
 	io.output = msg
@@ -115,30 +115,13 @@ func pasteIt(msg, title string) (string, error) {
 	return paste.String(), nil
 }
 
-// Help prints help information for accessing script library.
-func Help(f *flag.FlagSet, prefix, suffix string) string {
-	var s string
+// Help prints various command assistance.
+func Help(f *getopt.Set, prefix, suffix string) string {
 
-	s += prefix
+	var buf = new(bytes.Buffer)
+	f.PrintUsage(buf)
 
-	f.VisitAll(func(fflag *flag.Flag) {
-		s += fmt.Sprintf("  -%s", fflag.Name) // Two spaces before -; see next two comments.
-		name, usage := flag.UnquoteUsage(fflag)
-		if len(name) > 0 {
-			s += " " + name
-		}
-		// Boolean flags of one ASCII letter are so common we
-		// treat them specially, putting their usage on the same line.
-		if len(s) <= 4 { // space, space, '-', 'x'.
-			s += "\t"
-		} else {
-			// Four spaces before the tab triggers good alignment
-			// for both 4- and 8-space tab stops.
-			s += "\n      \t"
-		}
-		s += usage + "\n"
-	})
-	return s + suffix
+	return "```" + prefix + buf.String() + suffix + "```"
 }
 
 func channelsTemp() string {

@@ -50,19 +50,20 @@ type Message struct {
 	EditedContent   []string
 	Timestamp       time.Time
 	EditedTimestamp time.Time
-	Author          *User
+	Author          UserBasic
 	AuthorMsg       int
 }
 
 // Event has information regarding upcoming events.
 type Event struct {
 	ID          bson.ObjectId `bson:"_id,omitempty"`
+	Server      string
 	Description string
 	Day         string
 	HHMM        string
 	Time        time.Time
 	Protected   bool
-	AddedBy     *User
+	AddedBy     UserBasic
 }
 
 // User is a wrapper with additional functionality.
@@ -98,6 +99,7 @@ type chanBan struct {
 // UserBasic is just simple information to determine a user.
 type UserBasic struct {
 	ID            string
+	Server        string
 	Name          string
 	Discriminator string
 }
@@ -112,5 +114,5 @@ type Alias struct {
 	ID      bson.ObjectId `bson:"_id,omitempty"`
 	Caller  string        // String that calls the alias.
 	Linked  string        // What the real command is.
-	AddedBy *User         // Person who added alias.
+	AddedBy UserBasic     // Person who added alias.
 }
