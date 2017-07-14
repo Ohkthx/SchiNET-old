@@ -123,6 +123,7 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		if err != mgo.ErrNotFound {
 			return err
 		}
+		err = nil
 	} else {
 		io.io = aliasConv(io.io[0], link, io.input)
 	}
@@ -130,11 +131,15 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 	command := io.io[0]
 	switch strings.ToLower(command) {
 	case "help":
-		io.msgEmbed = embedCreator(globalHelp(), ColorYellow)
+		io.output = globalHelp()
 	case "roll":
 		io.miscRoll()
 	case "top10":
 		io.miscTop10()
+	case "gen":
+		io.roomGen()
+	case "sz":
+		io.msgEmbed = embedCreator(msgSize(io.msg.Message), ColorYellow)
 	case "user":
 		err = io.CoreUser()
 	case "alias":
@@ -190,13 +195,54 @@ func (cfg *Config) textTakeoverToggle(uID string) {
 }
 
 func globalHelp() string {
-	var msg = "*Most commands have a '-help' ability."
+	var msg = "*Most commands have a '--help' ability."
 	for t, cmd := range cmds {
 		msg += fmt.Sprintf("\n\n[ %s ]", t)
-		fmt.Printf("[ %s ]", t)
 		for c, txt := range cmd {
 			msg += fmt.Sprintf("\n\t%s\n\t\t%s", c, txt)
 		}
 	}
 	return "```" + msg + "```"
+}
+
+func msgSize(m *discordgo.Message) string {
+	var sz int
+	// Author sizes
+	usr := func(u *discordgo.User) {
+		sz += len(u.ID)
+		sz += len(u.Username)
+		sz += len(u.Avatar)
+		sz += len(u.Discriminator)
+		sz++ // Verified Bool
+		sz++ // Bot account
+	}
+
+	msgE := func(e *discordgo.MessageEmbed) {
+		sz += len(e.URL)
+		sz += len(e.Type)
+		sz += len(e.Title)
+		sz += len(e.Description)
+		sz += len(e.Timestamp)
+	}
+
+	sz += len(m.ID)
+	sz += len(m.ChannelID)
+	sz += len(m.Content[4:]) // Reduce for the ',sz '
+	sz += len(m.Timestamp)
+	sz += len(m.EditedTimestamp)
+	for _, mr := range m.MentionRoles {
+		sz += len(mr)
+	}
+
+	sz++ //Tts
+	sz++ // Mention everyone
+	usr(m.Author)
+	for _, u := range m.Mentions {
+		usr(u)
+	}
+	for _, e := range m.Embeds {
+		msgE(e)
+	}
+
+	return fmt.Sprintf("\nContent:\n%s\n\nSize of message: %d bytes\n", m.Content[4:], sz)
 }

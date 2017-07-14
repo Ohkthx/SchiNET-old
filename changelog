@@ -1,3 +1,9 @@
+0.5.2 - Additions:
+            - Small minor commands added.
+        Fixes:
+            - Issue with non-returning commands not being processes resolved.
+            - Minimum gamble amount of 50 set.
+
 0.5.1 - Additions:
             - Adding script library now happens by file attachments.
             - Auto-assigns several "default" aliases.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/d0x1p2/generate"
 	"github.com/d0x1p2/go_pastebin"
 	"github.com/pborman/getopt/v2"
 )
@@ -244,6 +245,11 @@ func (io *IOdat) histograph(s *discordgo.Session, database string) error {
 	s.ChannelMessageSend(io.msg.ChannelID, "```"+res+"```")
 
 	return nil
+}
+
+func (io *IOdat) roomGen() {
+	d := generate.NewDungeon()
+	io.output = "```\n" + d.String() + "```"
 }
 
 func monToString(i int) string {

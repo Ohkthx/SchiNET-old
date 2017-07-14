@@ -248,15 +248,7 @@ func (u *User) Get(uID string) error {
 
 	var user = User{}
 	user = dbdat.Document.(User)
-	u.ID = user.ID
-	u.Username = user.Username
-	u.Discriminator = user.Discriminator
-	u.Server = user.Server
-	u.Bot = user.Bot
-	u.Credits = user.Credits
-	u.CreditsTotal = user.CreditsTotal
-	u.Access = user.Access
-	u.LastSeen = user.LastSeen
+	*u = user
 
 	return nil
 }
@@ -645,7 +637,9 @@ func (u *User) Gamble(amount int) (string, error) {
 	var twealth, spoils int
 	var err error
 
-	if amount < u.Credits/10 {
+	if amount < 50 {
+		return "", ErrGambleNotMin(50)
+	} else if amount < u.Credits/10 {
 		return "", ErrGambleNotMin(u.Credits / 10)
 	} else if amount > u.Credits {
 		return "", ErrGambleNotEnough
