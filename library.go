@@ -26,9 +26,9 @@ var (
 )
 
 const (
-	scriptSyntaxGet  = ",script  --get      --user \"Username\"   --title \"Name Here\"\n"
-	scriptSyntaxAdd  = ",script  --add      --title \"Name Here\"   [Attach .txt File]\n"
-	scriptSyntaxEdit = ",script  --edit     --title \"Name Here\"   [Attach .txt File]\n"
+	scriptSyntaxGet  = ",script  --get   --user \"Username\"   --title \"Name Here\"\n"
+	scriptSyntaxAdd  = ",script  --add   --title \"Name Here\"   [Attach .txt File]\n"
+	scriptSyntaxEdit = ",script  --edit   --title \"Name Here\"   [Attach .txt File]\n"
 	scriptSyntaxDel  = ",script  --remove   --title \"Name Here\"\n"
 	scriptSyntaxAll  = "\n\n" + scriptSyntaxAdd + scriptSyntaxEdit + scriptSyntaxDel + scriptSyntaxGet
 
@@ -103,6 +103,7 @@ func (io *IOdat) CoreLibrary() error {
 		// Delete script in Database.
 		msg, err = lib.Delete()
 	} else if get && name != "" && user != "" {
+		lib.Script.Author.Name = user
 		msg, err = lib.Get()
 	} else if list {
 		// List scripts in Database.

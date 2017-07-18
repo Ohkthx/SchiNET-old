@@ -3,6 +3,7 @@
         Fixes:
             - Issue with non-returning commands not being processes resolved.
             - Minimum gamble amount of 50 set.
+            - Script lookup failing due to Author's name not being set to user flag.
 
 0.5.1 - Additions:
             - Adding script library now happens by file attachments.
