@@ -100,7 +100,13 @@ func (io *IOdat) CoreLibrary() error {
 	if (add || edit) && name != "" {
 		msg, err = lib.Add()
 	} else if remove && name != "" {
-		// Delete script in Database.
+		// Ability to delete as a moderator with specifying the --user flag.
+		if user != "" {
+			if ok := io.user.HasPermission(permModerator); !ok {
+				return ErrBadPermissions
+			}
+			lib.Script.Author.Name = user
+		}
 		msg, err = lib.Delete()
 	} else if get && name != "" && user != "" {
 		lib.Script.Author.Name = user
@@ -200,11 +206,6 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 		return "", err
 	}
 
-	/*
-		s.URL = changes.URL
-		s.Content = changes.Content
-		s.Length = len(changes.Content)
-	*/
 	c["$set"] = bson.M{
 		"url":          s.URL,
 		"content":      s.Content,
@@ -220,7 +221,7 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 	}
 
 	msg := fmt.Sprintf(
-		"__**%s** edited **%s**__"+
+		"__**%s** edited **%s**__\n"+
 			"**Added by**: %s\n"+
 			"**Date Added**: %s\n"+
 			"**Date Modified**: %s\n\n"+
@@ -247,6 +248,9 @@ func (lib *Library) Delete() (string, error) {
 	dbdat := DBdatCreate(lib.Database, CollectionScripts, lib.Script, q, nil)
 	err = dbdat.dbDelete()
 	if err != nil {
+		if err == mgo.ErrNotFound {
+			return "", fmt.Errorf("script doesn't exist, or you need to specify '--user' flag")
+		}
 		return "", err
 	}
 

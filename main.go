@@ -7,12 +7,13 @@ import (
 
 	mgo "gopkg.in/mgo.v2"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
 )
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.5.2"
+	_version       = "0.6.0"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -46,6 +47,10 @@ func init() {
 	cmds["normal"]["echo"] = "Echos a message given."
 	cmds["normal"]["roll"] = "How's your luck? Rolls 2 6d"
 	cmds["normal"]["top10"] = "Are you amongst the great?"
+	cmds["normal"]["ally"] = "Ally another guild."
+	cmds["normal"]["gen"] = "Generate a pseudo 21x21 map."
+	cmds["normal"]["sz"] = "Returns the size of a message."
+	cmds["normal"]["invite"] = "Bot invite information!"
 }
 
 // Bot Global interface for pulling discord information.
@@ -77,6 +82,7 @@ func main() {
 
 	bot.MessageHandler(cfg.msghandler)
 	bot.NewUserHandler(cfg.newUserHandler)
+	bot.GuildCreateHandler(cfg.newGuildHandler)
 	//bot.RemUserHandler(delUserHandler)
 	err = bot.Start()
 	if err != nil {
@@ -95,6 +101,11 @@ func main() {
 	if err := cfg.defaultAliases(); err != nil {
 		fmt.Println(err)
 		os.Exit(0)
+	}
+
+	if err := cfg.AlliancesLoad(); err != nil {
+		fmt.Println(err)
+		cfg.cleanup()
 	}
 
 	if !consoleDisable {
@@ -135,4 +146,26 @@ func (cfg *Config) defaultAliases() error {
 		}
 	}
 	return nil
+}
+
+func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCreate) {
+	if Bot != nil {
+		if err := Bot.UpdateConnections(); err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		user, err := cfg.Core.Session.GuildMember(ng.Guild.ID, ng.OwnerID)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		var admin = UserNew(ng.Guild.Name, user.User)
+		admin.PermissionAdd(permAdmin | permModerator | permNormal)
+		if err := admin.Update(); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
 }

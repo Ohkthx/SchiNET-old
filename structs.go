@@ -18,6 +18,8 @@ type Config struct {
 	TakeoverID string
 	Core       *godbot.Core
 	DB         *mgo.Session
+	Alliances  []Alliance
+	pending    []Alliance // Pending alliances.
 }
 
 // Bot is a wrapper for the godbot.Core

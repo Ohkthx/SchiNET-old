@@ -140,6 +140,10 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		io.roomGen()
 	case "sz":
 		io.msgEmbed = embedCreator(msgSize(io.msg.Message), ColorYellow)
+	case "invite":
+		io.msgEmbed = embedCreator(botInvite(), ColorGreen)
+	case "ally":
+		err = cfg.CoreAlliance(io)
 	case "user":
 		err = io.CoreUser()
 	case "alias":
@@ -192,6 +196,18 @@ func (cfg *Config) textTakeoverToggle(uID string) {
 		cfg.Takeover = true
 		cfg.TakeoverID = uID
 	}
+}
+
+func botInvite() string {
+	var msg string
+	msg += fmt.Sprintf(
+		"Invite me to your server!\n"+
+			"Click to Add-> %s\n\n"+
+			"Bot Support Server -> %s\n",
+		"https://discordapp.com/oauth2/authorize?&client_id=290843164892463104&scope=bot&permissions=2080898303",
+		"https://discord.gg/pk7eUwP",
+	)
+	return msg
 }
 
 func globalHelp() string {

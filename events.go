@@ -170,6 +170,7 @@ func (ev *Event) List() (string, error) {
 	var msg string
 	var err error
 	var t = time.Now()
+	var cnt int
 
 	dbdat := DBdatCreate(ev.Server, CollectionEvents, nil, nil, nil)
 	dbdat.dbGetAll(Event{})
@@ -180,6 +181,7 @@ func (ev *Event) List() (string, error) {
 
 	msg = "Upcoming Events:```C\n"
 	for n, e := range dbdat.Documents {
+		cnt++
 		var ev = e.(Event)
 		dur := ev.Time.Sub(t)
 		hours := int(dur.Hours())
@@ -193,7 +195,7 @@ func (ev *Event) List() (string, error) {
 			hours = int(dur.Hours())
 			// Update Database here with new time.
 			var q = make(map[string]interface{})
-			var c = q
+			var c = make(map[string]interface{})
 			q["_id"] = ev.ID
 			c["$set"] = bson.M{"time": ev.Time}
 			var dbdat = DBdatCreate(ev.Server, CollectionEvents, ev, q, c)
@@ -227,6 +229,10 @@ func (ev *Event) List() (string, error) {
 	}
 	for n, e := range events {
 		msg += fmt.Sprintf("\n[%d] -> %s", n, e)
+	}
+
+	if cnt == 0 {
+		msg += fmt.Sprintf("No events scheduled.\n")
 	}
 	msg += "```"
 

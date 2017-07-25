@@ -28,6 +28,7 @@ const (
 	CollectionScripts   = "library"
 	CollectionMessages  = "messages"
 	CollectionAlias     = "aliases"
+	CollectionAlliances = "alliances"
 )
 
 // DBdat passes information as to what to store into a database.
@@ -218,6 +219,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var m Message
 		bson.Unmarshal(byt, &m)
 		return m, nil
+	case Alliance:
+		var a Alliance
+		bson.Unmarshal(byt, &a)
+		return a, nil
 	default:
 		return nil, ErrBadInterface
 	}

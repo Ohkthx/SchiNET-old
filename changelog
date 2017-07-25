@@ -1,3 +1,16 @@
+0.6.0 - Additions:
+            - Guild-to-Guild channel bridges with the use of "ally"!
+            - Handler for guild creation with giving guild leader permissions.
+            - Bot invite link with "invite"!
+        Fixes:
+            - Persistent events now updating correctly.
+            - Events now displaying properly when no events are found.
+            - Moderators can properly delete scripts from database.
+            - Better error message for being unable to delete a script.
+            - Additional check to add to the CORRECT guild when a user joins.
+            - top10 deletes original message to prevent spam.
+            - All script pastes now use "vim" syntax highlighting instead of "c"
+
 0.5.2 - Additions:
             - Small minor commands added.
         Fixes:

@@ -47,6 +47,8 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 	// End logging message
 
+	cfg.AllianceHandler(m.ChannelID, m.Content, m.Author.Username)
+
 	// Return due to not being a command and/or just an Embed.
 	if io.command == false || len(io.io) == 0 {
 		return
@@ -97,7 +99,7 @@ func (cfg *Config) newUserHandler(s *discordgo.Session, nu *discordgo.GuildMembe
 		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
 
 		for _, ch := range Bot.Channels {
-			if ch.Name == "internal" {
+			if ch.Name == "internal" && ch.GuildID == nu.GuildID {
 				tn := time.Now()
 				msg := fmt.Sprintf("__**%s**#%s__ joined the server @ %s\n",
 					nu.User.Username, nu.User.Discriminator, tn.Format(time.UnixDate))

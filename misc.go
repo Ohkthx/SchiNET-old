@@ -54,6 +54,7 @@ func (io *IOdat) miscTop10() {
 		return
 	}
 
+	io.rm = true
 	io.output = fmt.Sprintf("**%s** is **NOT** top 10.", io.user.Username)
 
 	return
@@ -107,7 +108,7 @@ func pasteIt(msg, title string) (string, error) {
 		return "", err
 	}
 
-	paste, err := pb.Paste(msg, title, "c", "10M", "1")
+	paste, err := pb.Paste(msg, title, "vim", "10M", "1")
 	if err != nil {
 		fmt.Println(err)
 		return "", err
