@@ -34,6 +34,7 @@ type userFlags struct {
 	Xfer   bool // Transfer
 	Gamble bool // Gamble
 	Amount int  // Amount of Credits for action.
+	All    bool // All credits.
 
 	// Permission related
 	Permission bool
@@ -77,6 +78,19 @@ const permAll = permAdmin | permModerator | permAscended | permNormal
 func (io *IOdat) CoreUser() error {
 	u := io.user
 	var uflags userFlags
+	var all bool
+
+	for n, s := range io.io {
+		if s == "-n" {
+			if n+1 <= len(io.io) {
+				if io.io[n+1] == "all" {
+					io.io = append(io.io[:n], io.io[n+2:]...)
+					all = true
+					uflags.All = true
+				}
+			}
+		}
+	}
 
 	fl := getopt.New()
 
@@ -95,7 +109,10 @@ func (io *IOdat) CoreUser() error {
 	// Gambling related.
 	fl.FlagLong(&uflags.Xfer, "xfer", 'x', "Xfer credits")
 	fl.FlagLong(&uflags.Gamble, "gamble", 'g', "Gamble")
-	fl.Flag(&uflags.Amount, 'n', "Amount (Number)")
+	if !all {
+		fl.Flag(&uflags.Amount, 'n', "Amount (Number)")
+		fl.FlagLong(&uflags.All, "all", 0, "Gamble all Credits")
+	}
 
 	// Permission related.
 	fl.FlagLong(&uflags.Permission, "permission", 'p', "Permission Modification")
@@ -120,6 +137,9 @@ func (io *IOdat) CoreUser() error {
 	case uflags.Xfer:
 		msg, err = u.Transfer(uflags.Amount, uflags.User)
 	case uflags.Gamble:
+		if uflags.All {
+			uflags.Amount = u.Credits
+		}
 		msg, err = u.Gamble(uflags.Amount)
 	case uflags.Permission:
 		msg, err = u.Permission(uflags)
@@ -239,6 +259,25 @@ func (u *User) Get(uID string) error {
 	var q = make(map[string]interface{})
 
 	q["id"] = uID
+
+	var dbdat = DBdatCreate(u.Server, CollectionUsers, User{}, q, nil)
+	err := dbdat.dbGet(User{})
+	if err != nil {
+		return err
+	}
+
+	var user = User{}
+	user = dbdat.Document.(User)
+	*u = user
+
+	return nil
+}
+
+// GetByName from database.
+func (u *User) GetByName(username string) error {
+	var q = make(map[string]interface{})
+
+	q["username"] = username
 
 	var dbdat = DBdatCreate(u.Server, CollectionUsers, User{}, q, nil)
 	err := dbdat.dbGet(User{})

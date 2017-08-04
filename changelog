@@ -1,3 +1,16 @@
+0.6.1 - Additions:
+            - @mention support added to alliances- semi- close to the built-in for discord.
+            - Script/Library versioning support added. Plans to add support for script name changing.
+            - Credit resetting now accessible again.
+            - 'Gamble All' now accessible again. Required processing flags before the parser.
+            - Ability to get a user from database by username "GetByName"
+        Fixes:
+            - Minor additions to alliances (not able to ally yourself.)
+            - Proper removing of alliances from 'pending' state after they've been added.
+            - Alliance channels built at the time the allianced is formed and not when intialized.
+            - Permissions for credit reset modified, no longer requires "Ascended" (bot owner)
+
+
 0.6.0 - Additions:
             - Guild-to-Guild channel bridges with the use of "ally"!
             - Handler for guild creation with giving guild leader permissions.

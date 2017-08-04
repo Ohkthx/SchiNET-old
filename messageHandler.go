@@ -47,7 +47,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 	// End logging message
 
-	cfg.AllianceHandler(m.ChannelID, m.Content, m.Author.Username)
+	cfg.AllianceHandler(m.Message)
 
 	// Return due to not being a command and/or just an Embed.
 	if io.command == false || len(io.io) == 0 {

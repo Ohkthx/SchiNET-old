@@ -156,6 +156,8 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		err = io.CoreDatabase()
 	case "script", "scripts":
 		err = io.CoreLibrary()
+	case "reset":
+		io.output, err = creditsReset(io.guild.Name, io.msg.Author)
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return

@@ -61,14 +61,14 @@ func (io *IOdat) miscTop10() {
 }
 
 func creditsReset(database string, dgu *discordgo.User) (string, error) {
-	var msg = "Users reset:\n\n"
+	var msg = "```\nUsers reset:\n\n"
 	uID := dgu.ID
 	user := UserNew(database, dgu)
 	if err := user.Get(uID); err != nil {
 		return "", err
 	}
 
-	if ok := user.HasPermission(permAll); !ok {
+	if ok := user.HasPermission(permAdmin | permModerator); !ok {
 		return "", ErrBadPermissions
 	}
 
@@ -97,6 +97,8 @@ func creditsReset(database string, dgu *discordgo.User) (string, error) {
 	}
 	if !found {
 		msg = "No users updated."
+	} else {
+		msg += "\n```"
 	}
 	return msg, nil
 }

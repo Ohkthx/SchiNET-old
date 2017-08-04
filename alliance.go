@@ -9,6 +9,7 @@ import (
 
 	"strings"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
 	"github.com/pborman/getopt/v2"
 )
@@ -85,7 +86,6 @@ func (cfg *Config) CoreAlliance(io *IOdat) error {
 		if err := cfg.AllianceJoin(name, key, io.guild); err != nil {
 			return err
 		}
-		io.msgEmbed = embedCreator("You have joined the alliance.", ColorGreen)
 		return nil
 	}
 
@@ -107,20 +107,12 @@ func (cfg *Config) AllianceInit(name string, guild *godbot.Guild) error {
 		return errors.New("an alliance with that name already exists")
 	}
 
-	// Create channel in parent guild.
-	ch, err := cfg.Core.Session.GuildChannelCreate(guild.ID, name, "text")
-	if err != nil {
-		return err
-	}
-
 	var ally = Alliance{
 		Name: name,
 		Key:  guild.ID,
 		PartyA: Channel{
-			GuildID:     guild.ID,
-			GuildName:   guild.Name,
-			ChannelID:   ch.ID,
-			ChannelName: ch.Name,
+			GuildID:   guild.ID,
+			GuildName: guild.Name,
 		},
 	}
 	cfg.pending = append(cfg.pending, ally)
@@ -132,36 +124,56 @@ func (cfg *Config) AllianceInit(name string, guild *godbot.Guild) error {
 func (cfg *Config) AllianceJoin(name, key string, guild *godbot.Guild) error {
 	if name == "" {
 		return errors.New("need to supply an alliance name ('--name')")
-	}
-	if ok := cfg.AlliancePending(name, key); !ok {
+	} else if ok := cfg.AlliancePending(name, key); !ok {
 		return errors.New("alliance hasn't been initialized with ('--init') or ('--key') is bad")
+	} else if key == guild.ID {
+		return errors.New("you cannot ally yourself")
 	}
 
 	var ally Alliance
-	for _, a := range cfg.pending {
+	var loc int
+	for n, a := range cfg.pending {
 		if a.Key == key {
 			ally = a
+			loc = n
 		}
 	}
 
 	// Create Channel here.
-	ch, err := cfg.Core.Session.GuildChannelCreate(guild.ID, name, "text")
+	cha, err := cfg.Core.Session.GuildChannelCreate(ally.PartyA.GuildID, name, "text")
 	if err != nil {
 		return err
 	}
 
-	var party = Channel{
-		GuildID:     guild.ID,
-		GuildName:   guild.Name,
-		ChannelID:   ch.ID,
-		ChannelName: ch.Name,
+	// Create channel in parent guild.
+	ch1, err := cfg.Core.Session.GuildChannelCreate(guild.ID, name, "text")
+	if err != nil {
+		return err
 	}
 
-	ally.Party1 = party
+	ally.PartyA.ChannelID = cha.ID
+	ally.PartyA.ChannelName = cha.Name
+
+	var party1 = Channel{
+		GuildID:     guild.ID,
+		GuildName:   guild.Name,
+		ChannelID:   ch1.ID,
+		ChannelName: ch1.Name,
+	}
+
+	ally.Party1 = party1
+
+	// Remove from pending list.
+	cfg.pending = append(cfg.pending[:loc], cfg.pending[loc+1:]...)
 	cfg.Alliances = append(cfg.Alliances, ally)
 	if err := ally.Update(); err != nil {
 		return err
 	}
+
+	var msg = fmt.Sprintf("The [**%s**] alliance been created!", ally.Name)
+	embed := embedCreator(msg, ColorGreen)
+	cfg.Core.Session.ChannelMessageSendEmbed(ally.Party1.GuildID, embed)
+	cfg.Core.Session.ChannelMessageSendEmbed(ally.PartyA.GuildID, embed)
 
 	return nil
 }
@@ -193,9 +205,12 @@ func (cfg *Config) AlliancePending(name, key string) bool {
 }
 
 // AllianceHandler will check if channel is an alliance and process messages.
-func (cfg *Config) AllianceHandler(cID, content, username string) error {
+func (cfg *Config) AllianceHandler(m *discordgo.Message) error {
 	var ally Alliance
 	var found bool
+	cID := m.ChannelID
+	username := m.Author.Username
+
 	for _, a := range cfg.Alliances {
 		if a.PartyA.ChannelID == cID || a.Party1.ChannelID == cID {
 			ally = a
@@ -208,15 +223,35 @@ func (cfg *Config) AllianceHandler(cID, content, username string) error {
 		return nil
 	}
 
-	var rcvr string
+	var rcvID, rcvName string
 	if ally.PartyA.ChannelID == cID {
-		rcvr = ally.Party1.ChannelID
+		rcvID = ally.Party1.ChannelID
+		rcvName = ally.Party1.GuildName
 	} else {
-		rcvr = ally.PartyA.ChannelID
+		rcvID = ally.PartyA.ChannelID
+		rcvName = ally.PartyA.GuildName
 	}
 
-	var nc = "[ally]**" + username + "** --> " + content
-	if _, err := cfg.Core.Session.ChannelMessageSend(rcvr, nc); err != nil {
+	// Scan for @mentions
+	var content string
+	cSplit := strings.Split(m.Content, " ")
+	for _, w := range cSplit {
+		// Potentially a user.
+		if strings.HasPrefix(w, "@") {
+			un := strings.TrimPrefix(w, "@")
+			u := UserNew(rcvName, nil)
+			if err := u.GetByName(un); err == nil {
+				w = "<@" + u.ID + ">"
+			}
+		}
+		content += w + " "
+	}
+
+	var nc = "[ally]**" + username + "** --> " + content + "\n"
+	for _, a := range m.Attachments {
+		nc += "\n" + a.URL
+	}
+	if _, err := cfg.Core.Session.ChannelMessageSend(rcvID, nc); err != nil {
 		return err
 	}
 	return nil

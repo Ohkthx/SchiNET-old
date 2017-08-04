@@ -60,6 +60,7 @@ type Script struct {
 	Content      string
 	Length       int
 	URL          string
+	Version      float32
 	DateAdded    time.Time
 	DateModified time.Time
 	DateAccessed time.Time
@@ -71,6 +72,7 @@ func (io *IOdat) CoreLibrary() error {
 	var msg string
 
 	var add, edit, remove, get, list, help bool
+	var version float32
 	var user, name string
 
 	lib := LibraryNew(io.guild.Name, io.msg.Attachments)
@@ -83,6 +85,7 @@ func (io *IOdat) CoreLibrary() error {
 	fl.FlagLong(&get, "get", 'g', "Get a script")
 	fl.FlagLong(&user, "user", 0, "Script Owner")
 	fl.FlagLong(&name, "title", 't', "Title of script")
+	fl.FlagLong(&version, "version", 'v', "Versioning")
 	fl.FlagLong(&list, "list", 'l', "List all script in Library")
 	fl.FlagLong(&help, "help", 'h', "Help")
 
@@ -95,7 +98,7 @@ func (io *IOdat) CoreLibrary() error {
 		}
 	}
 
-	lib.Script = ScriptNew(name, "", io.user.Basic())
+	lib.Script = ScriptNew(name, "", version, io.user.Basic())
 
 	if (add || edit) && name != "" {
 		msg, err = lib.Add()
@@ -187,6 +190,7 @@ func (lib *Library) Add() (string, error) {
 
 	s.Content = txt
 	s.Length = len(txt)
+	s.Version = lib.Script.Version
 	return lib.Edit(s)
 }
 
@@ -210,6 +214,7 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 		"url":          s.URL,
 		"content":      s.Content,
 		"length":       s.Length,
+		"version":      s.Version,
 		"datemodified": tn,
 		"dateaccessed": tn,
 	}
@@ -223,14 +228,16 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 	msg := fmt.Sprintf(
 		"__**%s** edited **%s**__\n"+
 			"**Added by**: %s\n"+
+			"**Version**: %.1f\n"+
 			"**Date Added**: %s\n"+
 			"**Date Modified**: %s\n\n"+
 			"**URL**: [%s](%s) by %s\n"+
 			"**(Script will only be avaible for __10 minutes__.)*",
 		s.Author.String(), s.Name,
 		s.Author.String(),
+		s.Version,
 		s.DateAdded.Format(time.UnixDate),
-		s.DateModified.Format(time.UnixDate),
+		tn.Format(time.UnixDate),
 		s.Name, s.URL, s.Author.String(),
 	)
 
@@ -327,10 +334,10 @@ func (lib *Library) List() (string, error) {
 	}
 
 	var found bool
-	var msg = "Current Scripts in Library:\n\n"
+	var msg = "Current Scripts in Library:\n\nFormat: [User]  [Version]  [Title]\n"
 	for n, d := range docs {
 		found = true
-		msg += fmt.Sprintf("  [%d] %s -> %s\n", n, d.Author.Name, d.Name)
+		msg += fmt.Sprintf("  [%d] %s -> [v%.1f] %s\n", n, d.Author.Name, d.Version, d.Name)
 	}
 	if !found {
 		msg += "No scripts found in library.\n"
@@ -363,13 +370,14 @@ func (lib *Library) setAccessed() error {
 }
 
 // ScriptNew creates a new script object.
-func ScriptNew(name, content string, author UserBasic) *Script {
+func ScriptNew(name, content string, version float32, author UserBasic) *Script {
 	tn := time.Now()
 	return &Script{
 		Name:         name,
 		Author:       author,
 		Content:      content,
 		Length:       len(content),
+		Version:      version,
 		DateAdded:    tn,
 		DateModified: tn,
 		DateAccessed: tn,
@@ -385,12 +393,14 @@ func (s *Script) String() string {
 	msg := fmt.Sprintf(
 		"__Script Name: %s__\n\n"+
 			"**Added by**: %s\n"+
+			"**Version**: %.1f\n"+
 			"**Date Added**: %s\n"+
 			"**Date Modified**: %s\n\n"+
 			"**URL**: [%s](%s) by %s\n"+
 			"**(Script will only be avaible for __10 minutes__.)*",
 		s.Name,
 		s.Author.String(),
+		s.Version,
 		s.DateAdded.Format(time.UnixDate),
 		s.DateModified.Format(time.UnixDate),
 		s.Name, s.URL, s.Author.String(),
