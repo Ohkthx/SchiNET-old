@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/generate"
 	"github.com/d0x1p2/go_pastebin"
@@ -60,19 +63,21 @@ func (io *IOdat) miscTop10() {
 	return
 }
 
-func creditsReset(database string, dgu *discordgo.User) (string, error) {
+func creditsReset() (string, error) {
 	var msg = "```\nUsers reset:\n\n"
-	uID := dgu.ID
-	user := UserNew(database, dgu)
-	if err := user.Get(uID); err != nil {
-		return "", err
-	}
 
-	if ok := user.HasPermission(permAdmin | permModerator); !ok {
-		return "", ErrBadPermissions
-	}
+	/*
+		uID := dgu.ID
+		user := UserNew(dgu)
+		if err := user.Get(uID); err != nil {
+			return "", err
+		}
 
-	db := DBdatCreate(database, CollectionUsers, User{}, nil, nil)
+		if ok := user.HasPermission(permAdmin | permModerator); !ok {
+			return "", ErrBadPermissions
+		}
+	*/
+	db := DBdatCreate(Database, CollectionUsers, User{}, nil, nil)
 	if err := db.dbGetAll(User{}); err != nil {
 		return "", err
 	}
@@ -143,16 +148,16 @@ func channelsTemp() string {
 	return msg + "```"
 }
 
-func (io *IOdat) histograph(s *discordgo.Session, database string) error {
+func (io *IOdat) histograph(s *discordgo.Session) error {
 	var snd string
 	var mp = make(map[int]map[int]int)
 
-	if ok := io.user.HasPermission(permAdmin); !ok {
+	if ok := io.user.HasPermission(io.guild.ID, permAdmin); !ok {
 		return ErrBadPermissions
 	}
 
 	// Get ALL messages from Database
-	dat := DBdatCreate(database, CollectionMessages, Message{}, nil, nil)
+	dat := DBdatCreate(io.guild.Name, CollectionMessages, Message{}, nil, nil)
 	if err := dat.dbGetAll(Message{}); err != nil {
 		return err
 	}
@@ -283,4 +288,148 @@ func monToString(i int) string {
 		return "dec"
 	}
 	return ""
+}
+
+// ChannelNew creates a new channel object.
+func ChannelNew(cID, gName string) *ChannelInfo {
+	return &ChannelInfo{
+		ID:     cID,
+		Server: gName,
+	}
+}
+
+// ChannelCore handler for channel operations.
+func (io *IOdat) ChannelCore() error {
+	var err error
+	var msg string
+	var ch = ChannelNew(io.msg.ChannelID, io.guild.Name)
+
+	if !io.user.HasPermission(io.guild.ID, permAdmin) {
+		return ErrBadPermissions
+	}
+
+	if len(io.io) < 2 {
+		return ErrBadArgs
+	} else if io.io[1] == "enable" {
+		msg, err = ch.Enable()
+	} else if io.io[1] == "disable" {
+		msg, err = ch.Disable()
+	}
+
+	if err != nil {
+		return err
+	} else if msg != "" {
+		io.msgEmbed = embedCreator(msg, ColorGray)
+		return nil
+	}
+	return ErrBadArgs
+}
+
+// Enable a channel for bot commands.
+func (ch *ChannelInfo) Enable() (string, error) {
+	if err := ch.Get(); err != nil {
+		if err == mgo.ErrNotFound {
+			return "Bot commands already enabled here.", nil
+		}
+		return "", err
+	}
+
+	if ch.Enabled {
+		return "Bot commands already enabled here.", nil
+	}
+
+	ch.Enabled = true
+	if err := ch.Update(); err != nil {
+		return "", err
+	}
+	return "Bot commands enabled for this channel.", nil
+}
+
+// Disable a channel for bot commands.
+func (ch *ChannelInfo) Disable() (string, error) {
+	if err := ch.Get(); err != nil {
+		if err == mgo.ErrNotFound {
+			// Not found, need to add.
+			ch.Enabled = false
+			if err := ch.Update(); err != nil {
+				return "", err
+			}
+			return "Bot commands have been disabled here.", nil
+		}
+		return "", err
+	}
+
+	if !ch.Enabled {
+		return "Bot commands are already disabled here.", nil
+	}
+
+	ch.Enabled = false
+	if err := ch.Update(); err != nil {
+		return "", err
+	}
+	return "Bot commands have beem disabled here.", nil
+}
+
+// Check to see if a channel is eligible to do bot commands.
+func (ch *ChannelInfo) Check() bool {
+	if err := ch.Get(); err != nil {
+		if err == mgo.ErrNotFound {
+			return true
+		}
+		return false
+	}
+
+	if ch.Enabled {
+		return true
+	}
+
+	return false
+}
+
+// Get a channel from database.
+func (ch *ChannelInfo) Get() error {
+	var q = make(map[string]interface{})
+
+	q["id"] = ch.ID
+
+	var dbdat = DBdatCreate(ch.Server, CollectionChannels, ChannelInfo{}, q, nil)
+	err := dbdat.dbGet(ChannelInfo{})
+	if err != nil {
+		return err
+	}
+
+	var channel = ChannelInfo{}
+	channel = dbdat.Document.(ChannelInfo)
+	*ch = channel
+
+	return nil
+}
+
+// Update a channels representation in database.
+func (ch *ChannelInfo) Update() error {
+	var err error
+	var q = make(map[string]interface{})
+	var c = make(map[string]interface{})
+
+	q["id"] = ch.ID
+	c["$set"] = bson.M{
+		"name":    ch.Name,
+		"server":  ch.Server,
+		"enabled": ch.Enabled,
+	}
+
+	var dbdat = DBdatCreate(ch.Server, CollectionChannels, ch, q, c)
+	err = dbdat.dbEdit(ChannelInfo{})
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			// Add to DB since it doesn't exist.
+			if err := dbdat.dbInsert(); err != nil {
+				return err
+			}
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }

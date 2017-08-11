@@ -30,6 +30,14 @@ func (cfg *Config) core() {
 				}
 				fmt.Println(msg)
 				continue
+			} else if iodat.io[0] == "reset" {
+				if len(iodat.io) > 1 && iodat.io[1] == "credits" {
+					if _, err := creditsReset(); err != nil {
+						fmt.Println(err)
+					} else {
+						fmt.Println("Complete.")
+					}
+				}
 			}
 			err = cfg.ioHandler(iodat)
 			if err != nil {

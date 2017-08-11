@@ -223,13 +223,13 @@ func (cfg *Config) AllianceHandler(m *discordgo.Message) error {
 		return nil
 	}
 
-	var rcvID, rcvName string
+	var rcvID string //, rcvName string
 	if ally.PartyA.ChannelID == cID {
 		rcvID = ally.Party1.ChannelID
-		rcvName = ally.Party1.GuildName
+		//rcvName = ally.Party1.GuildName
 	} else {
 		rcvID = ally.PartyA.ChannelID
-		rcvName = ally.PartyA.GuildName
+		//rcvName = ally.PartyA.GuildName
 	}
 
 	// Scan for @mentions
@@ -239,7 +239,7 @@ func (cfg *Config) AllianceHandler(m *discordgo.Message) error {
 		// Potentially a user.
 		if strings.HasPrefix(w, "@") {
 			un := strings.TrimPrefix(w, "@")
-			u := UserNew(rcvName, nil)
+			u := UserNew(nil)
 			if err := u.GetByName(un); err == nil {
 				w = "<@" + u.ID + ">"
 			}

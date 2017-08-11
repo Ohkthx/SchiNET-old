@@ -17,7 +17,9 @@ import (
 
 // Flags that can be parsed related to User commands.
 type userFlags struct {
-	flag *getopt.Set // FlagSet object -> used for Help
+	flag       *getopt.Set // FlagSet object -> used for Help
+	server     string      // Server for opperation.
+	serverName string      // Name of the server.
 	// Generics
 	User    string // User to perform action on.
 	Comment string // Comment for action.
@@ -128,6 +130,7 @@ func (io *IOdat) CoreUser() error {
 
 	uflags.flag = fl
 	uflags.User = userIDClean(uflags.User)
+	uflags.server = io.guild.ID
 
 	var msg string
 	var err error
@@ -149,7 +152,7 @@ func (io *IOdat) CoreUser() error {
 			return nil
 		} else if uflags.User != "" {
 			// Get user information
-			user := UserNew(u.Server, nil)
+			user := UserNew(nil)
 			if err := user.Get(uflags.User); err != nil {
 				return err
 			}
@@ -171,7 +174,7 @@ func (io *IOdat) CoreUser() error {
 }
 
 // UserNew creates a new user instance based on accessing user.
-func UserNew(database string, u *discordgo.User) *User {
+func UserNew(u *discordgo.User) *User {
 	if u == nil {
 		u = &discordgo.User{
 			ID:            "",
@@ -184,21 +187,23 @@ func UserNew(database string, u *discordgo.User) *User {
 		ID:            u.ID,
 		Username:      u.Username,
 		Discriminator: u.Discriminator,
-		Server:        database,
 		Bot:           u.Bot,
 		CreditsTotal:  1,
 		Credits:       1,
-		Access:        permNormal,
 	}
 	return &user
 }
 
 // UserUpdateSimple stream-lines the process for incrementing credits.
-func UserUpdateSimple(database string, user *discordgo.User, inc int, ts time.Time) error {
-	u := UserNew(database, user)
+func UserUpdateSimple(serverID string, user *discordgo.User, inc int, ts time.Time) error {
+	u := UserNew(user)
 
 	if err := u.Get(u.ID); err != nil {
 		if err == mgo.ErrNotFound {
+			u.Credits = 0
+			u.CreditsTotal = 0
+			u.LastSeen = ts
+			u.Access = append(u.Access, Access{ServerID: serverID, Permissions: permNormal})
 			if err := u.Update(); err != nil {
 				return err
 			}
@@ -210,9 +215,13 @@ func UserUpdateSimple(database string, user *discordgo.User, inc int, ts time.Ti
 	if inc == 1 {
 		u.CreditsTotal++
 		u.Credits++
-		u.LastSeen = ts
 	} else {
 		u.Credits += inc
+	}
+
+	// Make sure to only add most recent messages in time.
+	if ts.After(u.LastSeen) {
+		u.LastSeen = ts
 	}
 
 	if err := u.Update(); err != nil {
@@ -234,11 +243,11 @@ func (u *User) Update() error {
 		"username":     u.Username,
 		"creditstotal": u.CreditsTotal,
 		"credits":      u.Credits,
-		"server":       u.Server,
 		"access":       u.Access,
-		"lastseen":     u.LastSeen}
+		"lastseen":     u.LastSeen,
+	}
 
-	var dbdat = DBdatCreate(u.Server, CollectionUsers, u, q, c)
+	var dbdat = DBdatCreate(Database, CollectionUsers, u, q, c)
 	err = dbdat.dbEdit(User{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -260,7 +269,7 @@ func (u *User) Get(uID string) error {
 
 	q["id"] = uID
 
-	var dbdat = DBdatCreate(u.Server, CollectionUsers, User{}, q, nil)
+	var dbdat = DBdatCreate(Database, CollectionUsers, User{}, q, nil)
 	err := dbdat.dbGet(User{})
 	if err != nil {
 		return err
@@ -279,7 +288,7 @@ func (u *User) GetByName(username string) error {
 
 	q["username"] = username
 
-	var dbdat = DBdatCreate(u.Server, CollectionUsers, User{}, q, nil)
+	var dbdat = DBdatCreate(Database, CollectionUsers, User{}, q, nil)
 	err := dbdat.dbGet(User{})
 	if err != nil {
 		return err
@@ -302,13 +311,11 @@ func (u *User) EmbedCreate() *discordgo.MessageEmbed {
 	description := fmt.Sprintf(
 		"__ID: %s__\n"+
 			"**Username**:   %-18s **%s**: %-10d\n"+
-			"**Reputation**: %d\n"+
-			"**Permissions**: %s\n\n"+
+			"**Reputation**: %d\n\n"+
 			"**Last Seen**: %s",
 		u.ID,
 		fmt.Sprintf("%s#%s", u.Username, u.Discriminator), strings.Title(GambleCredits), u.Credits,
 		u.CreditsTotal,
-		permString(u.Access),
 		ta)
 
 	return &discordgo.MessageEmbed{
@@ -333,7 +340,6 @@ func (u *User) StringPretty() string {
 func (u *User) Basic() UserBasic {
 	return UserBasic{
 		ID:            u.ID,
-		Server:        u.Server,
 		Name:          u.Username,
 		Discriminator: u.Discriminator,
 	}
@@ -374,18 +380,18 @@ func (u *User) Ban(cID string, fl userFlags) (string, error) {
 		return "", err
 	}
 
-	if ok := u.HasPermission(permAdmin); !ok {
+	if ok := u.HasPermission(fl.server, permAdmin); !ok {
 		return "", ErrBadPermissions
 	} else if fl.Help {
 		prefix := "**Need** __type__ and __username__.\n\n"
 		return Help(fl.flag, prefix, banSyntaxAll), nil
 	} else if fl.List {
-		return banList(u.Server)
+		return banList(fl.serverName, fl.server)
 	}
 
 	if (fl.Type == "soft" || fl.Type == "hard") && (uID != "") {
 		// Find user.
-		criminal := UserNew(u.Server, nil)
+		criminal := UserNew(nil)
 		if err = criminal.Get(uID); err != nil {
 			return "", err
 		}
@@ -395,34 +401,34 @@ func (u *User) Ban(cID string, fl userFlags) (string, error) {
 		b.ByLast = &UserBasic{ID: u.ID, Name: u.Username, Discriminator: u.Discriminator}
 
 		if fl.Type == "soft" {
-			if msg, err = b.banSoft(criminal.Server, cID, fl.Comment, fl.Remove); err != nil {
+			if msg, err = b.banSoft(fl.server, cID, fl.Comment, fl.Remove); err != nil {
 				return "", err
 			}
 		} else if fl.Type == "hard" {
-			if msg, err = b.banHard(criminal.Server, cID, fl.Comment, fl.Remove); err != nil {
+			if msg, err = b.banHard(fl.server, cID, fl.Comment, fl.Remove); err != nil {
 				return "", err
 			}
 		}
 	} else if fl.Type == "bot" && uID != "" {
-		criminal := UserNew(u.Server, nil)
+		criminal := UserNew(nil)
 		if err = criminal.Get(uID); err != nil {
 			return "", err
 		}
 
 		msg = fmt.Sprintf("Bot access has been __**revoked**__ for <@%s>.", criminal.ID)
-		criminal.Access = 0
+		criminal.PermissionSet(fl.server, 0)
 		if fl.Remove {
-			criminal.Access |= permNormal
+			criminal.PermissionAdd(fl.server, permNormal)
 			msg = fmt.Sprintf("Bot access has been __**restored**__ for <@%s>.", criminal.ID)
 		} else {
 			var b = criminal.BanNew()
-			if err := b.Get(criminal.Server); err != nil {
+			if err := b.Get(fl.server); err != nil {
 				if err != mgo.ErrNotFound {
 					return "", err
 				}
 			}
 			b.Amount++
-			if err := b.Update(criminal.Server); err != nil {
+			if err := b.Update(fl.server); err != nil {
 				return "", err
 			}
 		}
@@ -621,7 +627,7 @@ func (b *Ban) Update(database string) error {
 	return nil
 }
 
-func banList(database string) (string, error) {
+func banList(database, id string) (string, error) {
 	var msg string
 
 	db := DBdatCreate(database, CollectionBlacklist, Ban{}, nil, nil)
@@ -640,17 +646,17 @@ func banList(database string) (string, error) {
 	for _, criminal := range db.Documents {
 		var botban bool
 		b = criminal.(Ban)
-		u := UserNew(database, nil)
+		u := UserNew(nil)
 		if err := u.Get(b.User.ID); err != nil {
 			fmt.Println("Could not get user while getting ban list", err.Error())
 		}
-		if u.Access&permNormal != permNormal {
+		if !u.HasPermission(id, permNormal) {
 			botban = true
 		}
 
 		if len(b.Channels) > 0 || botban {
 			found = true
-			msg += fmt.Sprintf("\t**__%s**#%s__\n", b.User.Name, b.User.Discriminator)
+			msg += fmt.Sprintf("\t__**%s**#%s__\n", b.User.Name, b.User.Discriminator)
 			if botban {
 				msg += "\t\t**Bot Banned.**\n"
 			}
@@ -693,7 +699,7 @@ func (u *User) Gamble(amount int) (string, error) {
 			"%s remaining in bank: **%d**.",
 			u.StringPretty(), amount, GambleCredits, strings.Title(GambleCredits), twealth)
 
-		bu := UserNew(u.Server, Bot.User)
+		bu := UserNew(Bot.User)
 		bu.Get(bu.ID)
 		bu.Credits += amount
 		err = bu.Update()
@@ -731,7 +737,7 @@ func (u *User) Transfer(amount int, uID string) (string, error) {
 		return msg, nil
 	}
 
-	u2 := UserNew(u.Server, nil)
+	u2 := UserNew(nil)
 	if err := u2.Get(uID); err != nil {
 		return "", err
 	}
@@ -793,7 +799,7 @@ func gambleAlgorithm(l, d, t, credits int) int {
 // Permission handles Adding and Removing permissions for a user.
 func (u *User) Permission(fl userFlags) (string, error) {
 
-	if ok := u.HasPermission(permAdmin); !ok {
+	if ok := u.HasPermission(fl.server, permAdmin); !ok {
 		return "", ErrBadPermissions
 	} else if fl.Help {
 		// Print Help + Syntax
@@ -819,18 +825,18 @@ func (u *User) Permission(fl userFlags) (string, error) {
 			return "Bad permission\n" + permList(), nil
 		}
 		// Add permission
-		user := UserNew(u.Server, nil)
+		user := UserNew(nil)
 		if err := user.Get(id); err != nil {
 			return "", err
 		}
 		if fl.Add {
-			user.PermissionAdd(perm)
+			user.PermissionAdd(fl.server, perm)
 			if err := user.Update(); err != nil {
 				return "", err
 			}
 			msg = fmt.Sprintf("%s has added the __**%s**__ permission to %s", u.StringPretty(), fl.Type, user.StringPretty())
 		} else {
-			user.PermissionDelete(perm)
+			user.PermissionDelete(fl.server, perm)
 			if err := user.Update(); err != nil {
 				return "", err
 			}
@@ -846,13 +852,67 @@ func (u *User) Permission(fl userFlags) (string, error) {
 }
 
 // HasPermission returns True if have permissions for action, false if not.
-func (u *User) HasPermission(access int) bool { return u.Access&access == access }
+func (u *User) HasPermission(server string, access int) bool {
+	var found bool
+	var loc int
+	for n, s := range u.Access {
+		if s.ServerID == server {
+			found = true
+			loc = n
+		}
+	}
+
+	if found {
+		return u.Access[loc].Permissions&access == access
+	}
+
+	u.Access = append(u.Access, Access{ServerID: server, Permissions: permNormal})
+	return false
+}
 
 // PermissionAdd upgrades a user to new permissions
-func (u *User) PermissionAdd(access int) { u.Access |= access }
+func (u *User) PermissionAdd(server string, access int) {
+	for n, s := range u.Access {
+		if s.ServerID == server {
+			u.Access[n].Permissions |= access
+			return
+		}
+	}
+
+	u.Access = append(u.Access, Access{ServerID: server, ServerName: "", Permissions: permNormal | access})
+	return
+}
 
 // PermissionDelete strips a permission from an User
-func (u *User) PermissionDelete(access int) { u.Access ^= access }
+func (u *User) PermissionDelete(server string, access int) {
+	for n, s := range u.Access {
+		if s.ServerID == server {
+			u.Access[n].Permissions ^= access
+			return
+		}
+	}
+
+	newPerm := Access{ServerID: server, ServerName: "", Permissions: permNormal}
+	newPerm.Permissions ^= access
+	u.Access = append(u.Access, newPerm)
+
+	return
+}
+
+// PermissionSet assigns a specific access level.
+func (u *User) PermissionSet(server string, access int) {
+	for n, s := range u.Access {
+		if s.ServerID == server {
+			u.Access[n].Permissions = access
+			return
+		}
+	}
+
+	newPerm := Access{ServerID: server, ServerName: "", Permissions: access}
+	u.Access = append(u.Access, newPerm)
+
+	return
+}
 
 // Convert a Permission from a String to an Int.
 func permInt(p string) int {

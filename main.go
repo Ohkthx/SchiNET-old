@@ -13,7 +13,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.6.1"
+	_version       = "0.6.2"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -40,6 +40,7 @@ func init() {
 
 	cmds["mod"]["event"] = "Add/Edit/Remove server events."
 	cmds["mod"]["alias"] = "Add/Remove command aliases."
+	cmds["mod"]["channel"] = "Enable/Disable commands in current channel."
 
 	cmds["normal"]["script"] = "Add/Edit/Remove scripts for the local server."
 	cmds["normal"]["event"] = "View events that are currently scheduled."
@@ -136,13 +137,11 @@ func (cfg *Config) defaultAliases() error {
 	aliases[2] = aliasSimple{"permission", "user --permission"}
 	aliases[3] = aliasSimple{"xfer", "user --xfer "}
 
-	for _, g := range cfg.Core.Guilds {
-		for _, a := range aliases {
-			user := UserNew(g.Name, cfg.Core.User)
-			alias := AliasNew(a.caller, a.linked, user)
-			if err := alias.Update(); err != nil {
-				return err
-			}
+	for _, a := range aliases {
+		user := UserNew(cfg.Core.User)
+		alias := AliasNew(a.caller, a.linked, user)
+		if err := alias.Update(); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -161,8 +160,8 @@ func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCrea
 			return
 		}
 
-		var admin = UserNew(ng.Guild.Name, user.User)
-		admin.PermissionAdd(permAdmin | permModerator | permNormal)
+		var admin = UserNew(user.User)
+		admin.PermissionAdd(ng.ID, permAdmin|permModerator|permNormal)
 		if err := admin.Update(); err != nil {
 			fmt.Println(err)
 			return

@@ -60,7 +60,7 @@ func (io *IOdat) CoreEvent() error {
 		io.output = Help(fl, prefix, suffix)
 		return nil
 	} else if list {
-		ev := EventNew("", "", "", io.user, false)
+		ev := EventNew(io.guild.Name, "", "", "", io.user, false)
 		msg, err := ev.List()
 		if err != nil {
 			return err
@@ -70,10 +70,10 @@ func (io *IOdat) CoreEvent() error {
 	}
 
 	if (add || edit || del) && day != "" {
-		if ok := io.user.HasPermission(permAdmin); !ok {
+		if ok := io.user.HasPermission(io.guild.ID, permAdmin); !ok {
 			return ErrBadPermissions
 		}
-		ev := EventNew(comment, day, time, io.user, persist)
+		ev := EventNew(io.guild.Name, comment, day, time, io.user, persist)
 
 		var err error
 		var msg string
@@ -92,7 +92,7 @@ func (io *IOdat) CoreEvent() error {
 		}
 	}
 
-	ev := EventNew("", "", "", io.user, false)
+	ev := EventNew(io.guild.Name, "", "", "", io.user, false)
 	msg, err := ev.List()
 	if err != nil {
 		return err
@@ -103,7 +103,7 @@ func (io *IOdat) CoreEvent() error {
 }
 
 // EventNew creates a new Event object that can be acted on.
-func EventNew(desc, day, t string, u *User, persist bool) *Event {
+func EventNew(database, desc, day, t string, u *User, persist bool) *Event {
 
 	da, _ := evDayAdd(day)
 	hhmm, _ := evHHMM(t)
@@ -112,7 +112,7 @@ func EventNew(desc, day, t string, u *User, persist bool) *Event {
 	ts := time.Date(now.Year(), now.Month(), now.Day()+da, hhmm[0], hhmm[1], 0, 0, now.Location())
 
 	return &Event{
-		Server:      u.Server,
+		Server:      database,
 		Description: desc,
 		Day:         day,
 		HHMM:        t,
@@ -187,7 +187,7 @@ func (ev *Event) List() (string, error) {
 		hours := int(dur.Hours())
 
 		if hours < -12 && ev.Protected {
-			ev.Time, err = evTime(ev.Day, ev.HHMM, true)
+			ev.Time, err = evTime(ev.Day, ev.HHMM, false)
 			if err != nil {
 				return "", err
 			}
@@ -298,17 +298,23 @@ func evTime(wd, hhmms string, rollover bool) (time.Time, error) {
 	var da int
 	var err error
 
+	hhmm, err := evHHMM(hhmms)
+	if err != nil {
+		return t, err
+	}
+
 	if rollover {
-		da = 7
+		if hhmm[0] < 12 {
+			da = 7
+		} else {
+			da = 6
+		}
 	} else {
 		da, err = evDayAdd(wd)
 		if err != nil {
 			return t, err
 		}
 	}
-	hhmm, err := evHHMM(hhmms)
-	if err != nil {
-		return t, err
-	}
+
 	return time.Date(t.Year(), t.Month(), t.Day()+da, hhmm[0], hhmm[1], 0, 0, t.Location()), nil
 }

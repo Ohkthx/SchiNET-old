@@ -18,8 +18,9 @@ var (
 	//CollectionMessages = func(c string) string { return "messages." + c }
 )
 
-// Collection constants
+// Collection and Database constants
 const (
+	Database            = "discord"
 	CollectionEvents    = "events"
 	CollectionUsers     = "users"
 	CollectionBlacklist = "blacklist"
@@ -29,6 +30,7 @@ const (
 	CollectionMessages  = "messages"
 	CollectionAlias     = "aliases"
 	CollectionAlliances = "alliances"
+	CollectionChannels  = "channels"
 )
 
 // DBdat passes information as to what to store into a database.
@@ -223,6 +225,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var a Alliance
 		bson.Unmarshal(byt, &a)
 		return a, nil
+	case ChannelInfo:
+		var c ChannelInfo
+		bson.Unmarshal(byt, &c)
+		return c, nil
 	default:
 		return nil, ErrBadInterface
 	}

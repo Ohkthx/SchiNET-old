@@ -28,7 +28,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	if m.Author.Bot {
 		if m.Author.ID == Bot.User.ID {
 			ts, _ := m.Timestamp.Parse()
-			if err := UserUpdateSimple(io.guild.Name, m.Author, 1, ts); err != nil {
+			if err := UserUpdateSimple(io.guild.ID, m.Author, 1, ts); err != nil {
 				return
 			}
 		}
@@ -42,7 +42,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	// Log message into Database
-	if _, err := messageLog(io.guild.Name, c.Name, m.Message); err != nil {
+	if _, err := messageLog(io.guild.Name, io.guild.ID, c.Name, m.Message); err != nil {
 		fmt.Println(err)
 	}
 	// End logging message
@@ -54,7 +54,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 		return
 	}
 
-	var u = UserNew(io.guild.Name, m.Author)
+	var u = UserNew(m.Author)
 	if err := u.Get(m.Author.ID); err != nil {
 		fmt.Println(err)
 		return
@@ -66,9 +66,9 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	if io.io[0] == "takeover" {
 		tko = true
 	}
-	if ok := cfg.takeoverCheck(m.ID, m.ChannelID, m.Content, tko, u); ok {
+	if ok := cfg.takeoverCheck(m.ID, m.ChannelID, io.guild.ID, m.Content, tko, u); ok {
 		return
-	} else if ok := u.HasPermission(permNormal); !ok {
+	} else if ok := u.HasPermission(io.guild.ID, permNormal); !ok {
 		return
 	}
 
@@ -123,14 +123,14 @@ func delUserHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
 	}
 }
 
-func messageLog(database, channel string, msg *discordgo.Message) (bool, error) {
+func messageLog(database, databaseID, channel string, msg *discordgo.Message) (bool, error) {
 
-	m := MessageNew(database, channel, msg)
+	m := MessageNew(database, databaseID, channel, msg)
 	if ok, err := m.Update(database); err != nil {
 		return false, err
 	} else if ok {
 		ts, _ := msg.Timestamp.Parse()
-		if err := UserUpdateSimple(database, msg.Author, 1, ts); err != nil {
+		if err := UserUpdateSimple(databaseID, msg.Author, 1, ts); err != nil {
 			fmt.Println("updating/adding user", err)
 		}
 		return true, nil
@@ -173,7 +173,7 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 			for n, m := range msgs {
 				mID = m.ID
 
-				if ok, err := messageLog(gName, c.Name, m); err != nil {
+				if ok, err := messageLog(gName, gID, c.Name, m); err != nil {
 					fmt.Println("Error logging message", err.Error())
 				} else if ok {
 					missed++
@@ -197,10 +197,14 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 }
 
 // MessageNew returns a new message object.
-func MessageNew(database, channel string, m *discordgo.Message) *Message {
-	u := UserNew(database, m.Author)
+func MessageNew(database, databaseID, channel string, m *discordgo.Message) *Message {
+	u := UserNew(m.Author)
 	if err := u.Get(m.Author.ID); err != nil {
 		// Most likely not found or first message.
+		u.Credits = 0
+		u.CreditsTotal = 0
+		u.LastSeen, _ = m.Timestamp.Parse()
+		u.Access = append(u.Access, Access{ServerID: databaseID, Permissions: permNormal})
 		if err1 := u.Update(); err1 != nil {
 			// Database error. Log error.
 		}

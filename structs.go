@@ -73,12 +73,18 @@ type User struct {
 	ID            string `bson:"id"`
 	Username      string
 	Discriminator string
-	Access        int
-	Server        string
+	Access        []Access
 	Bot           bool
 	Credits       int
 	CreditsTotal  int
 	LastSeen      time.Time `bson:"lastseen"`
+}
+
+// Access holds guild/server specific information about the user.
+type Access struct {
+	ServerID    string
+	ServerName  string
+	Permissions int
 }
 
 // Ban contains data pertaining to a ban.
@@ -96,6 +102,14 @@ type chanBan struct {
 	Comment   string
 	By        *UserBasic
 	Date      time.Time
+}
+
+// ChannelInfo represents a channel... lol
+type ChannelInfo struct {
+	ID      string
+	Name    string
+	Server  string
+	Enabled bool
 }
 
 // UserBasic is just simple information to determine a user.

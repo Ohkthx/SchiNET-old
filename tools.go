@@ -116,6 +116,15 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		return nil
 	}
 
+	// Make sure the channel is allowed to have bot commmands.
+	if io.io[0] != "channel" {
+		ch := ChannelNew(io.msg.ChannelID, io.guild.Name)
+		if !io.user.HasPermission(io.guild.ID, permModerator) && !ch.Check() {
+			io.msgEmbed = embedCreator("Bot commands have been disabled here.", ColorGray)
+			return nil
+		}
+	}
+
 	// Check if an alias here
 	alias := AliasNew(io.io[0], "", io.user)
 	link, err := alias.Check()
@@ -149,15 +158,15 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 	case "alias":
 		err = io.CoreAlias()
 	case "histo":
-		err = io.histograph(cfg.Core.Session, io.guild.Name)
+		err = io.histograph(cfg.Core.Session)
+	case "channel":
+		err = io.ChannelCore()
 	case "event", "events":
 		err = io.CoreEvent()
 	case "cmd", "command":
 		err = io.CoreDatabase()
 	case "script", "scripts":
 		err = io.CoreLibrary()
-	case "reset":
-		io.output, err = creditsReset(io.guild.Name, io.msg.Author)
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return
@@ -174,10 +183,10 @@ func embedCreator(description string, color int) *discordgo.MessageEmbed {
 	}
 }
 
-func (cfg *Config) takeoverCheck(mID, cID, content string, toggle bool, u *User) bool {
+func (cfg *Config) takeoverCheck(mID, cID, gID, content string, toggle bool, u *User) bool {
 	s := cfg.Core.Session
 	if toggle {
-		if ok := u.HasPermission(permAscended); ok {
+		if ok := u.HasPermission(gID, permAscended); ok {
 			cfg.textTakeoverToggle(u.ID)
 			s.ChannelMessageSend(cID, fmt.Sprintf("Takover enabled: %s", strconv.FormatBool(cfg.Takeover)))
 			return true

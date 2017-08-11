@@ -1,3 +1,12 @@
+0.6.2 - Additions:
+            - Ability to set permissions to a specific numeral.
+            - Ability to enable and disable bot commands in specific channels.
+        Fixes:
+            - Rearraged database storage. Users are now centralized.
+            - Modified Permissions: Adding, Removing, Checking.
+            - User message count more accurate. 
+            - User LastSeen is correctly reporting the last occurence of a user.
+
 0.6.1 - Additions:
             - @mention support added to alliances- semi- close to the built-in for discord.
             - Script/Library versioning support added. Plans to add support for script name changing.
@@ -9,7 +18,6 @@
             - Proper removing of alliances from 'pending' state after they've been added.
             - Alliance channels built at the time the allianced is formed and not when intialized.
             - Permissions for credit reset modified, no longer requires "Ascended" (bot owner)
-
 
 0.6.0 - Additions:
             - Guild-to-Guild channel bridges with the use of "ally"!

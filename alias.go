@@ -56,7 +56,7 @@ func (io *IOdat) CoreAlias() error {
 		}
 	}
 
-	if u.Access < permModerator {
+	if !u.HasPermission(io.guild.ID, permModerator) {
 		return ErrBadPermissions
 	}
 

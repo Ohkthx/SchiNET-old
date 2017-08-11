@@ -105,7 +105,7 @@ func (io *IOdat) CoreLibrary() error {
 	} else if remove && name != "" {
 		// Ability to delete as a moderator with specifying the --user flag.
 		if user != "" {
-			if ok := io.user.HasPermission(permModerator); !ok {
+			if ok := io.user.HasPermission(io.guild.ID, permModerator); !ok {
 				return ErrBadPermissions
 			}
 			lib.Script.Author.Name = user
