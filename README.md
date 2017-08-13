@@ -21,12 +21,14 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + Aliases to commands.
 + Server Message Histograms.
 + Permissions for bot manipulation.
++ Events with countdown.
++ Channel enable/disabling of bot commands by normal users.
 
 ### TODO/Reimplement List
 + Support for Vita-Nex: Core API
 + ~~Support for SQL~~
 + Public and Private Notifications
-+ Event Timers and Tracking
++ ~~Event Timers and Tracking~~
 + ~~Message Count Gambling~~
 + Move ENV variables to CFG/INI file.
 + ~~Event Handlers for creating/deleting channels~~

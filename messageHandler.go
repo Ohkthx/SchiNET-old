@@ -205,8 +205,20 @@ func MessageNew(database, databaseID, channel string, m *discordgo.Message) *Mes
 		u.CreditsTotal = 0
 		u.LastSeen, _ = m.Timestamp.Parse()
 		u.Access = append(u.Access, Access{ServerID: databaseID, Permissions: permNormal})
-		if err1 := u.Update(); err1 != nil {
-			// Database error. Log error.
+
+	} else {
+		var found bool
+		for _, a := range u.Access {
+			if a.ServerID == databaseID {
+				found = true
+			}
+		}
+
+		if !found {
+			u.Access = append(u.Access, Access{ServerID: databaseID, Permissions: permNormal})
+			if err1 := u.Update(); err1 != nil {
+				// Database error. Log error.
+			}
 		}
 	}
 

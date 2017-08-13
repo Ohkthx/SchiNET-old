@@ -84,12 +84,16 @@ func (io *IOdat) CoreUser() error {
 
 	for n, s := range io.io {
 		if s == "-n" {
-			if n+1 <= len(io.io) {
+			if n+1 <= len(io.io)-1 {
 				if io.io[n+1] == "all" {
 					io.io = append(io.io[:n], io.io[n+2:]...)
 					all = true
 					uflags.All = true
+				} else {
+					break
 				}
+			} else {
+				io.io = append(io.io, "0")
 			}
 		}
 	}
@@ -142,6 +146,8 @@ func (io *IOdat) CoreUser() error {
 	case uflags.Gamble:
 		if uflags.All {
 			uflags.Amount = u.Credits
+		} else if len(io.io) < 4 {
+			return ErrBadArgs
 		}
 		msg, err = u.Gamble(uflags.Amount)
 	case uflags.Permission:
@@ -867,6 +873,24 @@ func (u *User) HasPermission(server string, access int) bool {
 	}
 
 	u.Access = append(u.Access, Access{ServerID: server, Permissions: permNormal})
+	return false
+}
+
+// HasPermissionGTE to what is suppled. (Greater Than or Equal)
+func (u *User) HasPermissionGTE(server string, access int) bool {
+	var found bool
+	var loc int
+	for n, s := range u.Access {
+		if s.ServerID == server {
+			found = true
+			loc = n
+		}
+	}
+
+	if found {
+		return u.Access[loc].Permissions >= access
+	}
+
 	return false
 }
 

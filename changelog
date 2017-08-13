@@ -1,3 +1,10 @@
+0.6.21 - Additions:
+            - HasPermissionGTE for checking to see if user is of equal or higher than permissions.
+         Fixes:
+            - Gamble built-in alias no longer accessing nil memory. Occured when no number provided.
+            - User permissions being updated properly on alternative channels (with permNormal/base)
+            - Syntax for reporting locked/unlocked channels. 
+
 0.6.2 - Additions:
             - Ability to set permissions to a specific numeral.
             - Ability to enable and disable bot commands in specific channels.

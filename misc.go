@@ -304,7 +304,7 @@ func (io *IOdat) ChannelCore() error {
 	var msg string
 	var ch = ChannelNew(io.msg.ChannelID, io.guild.Name)
 
-	if !io.user.HasPermission(io.guild.ID, permAdmin) {
+	if !io.user.HasPermissionGTE(io.guild.ID, permAdmin) {
 		return ErrBadPermissions
 	}
 
@@ -329,20 +329,20 @@ func (io *IOdat) ChannelCore() error {
 func (ch *ChannelInfo) Enable() (string, error) {
 	if err := ch.Get(); err != nil {
 		if err == mgo.ErrNotFound {
-			return "Bot commands already enabled here.", nil
+			return "Bot commands are already enabled in this channel.", nil
 		}
 		return "", err
 	}
 
 	if ch.Enabled {
-		return "Bot commands already enabled here.", nil
+		return "Bot commands are already enabled in this channel.", nil
 	}
 
 	ch.Enabled = true
 	if err := ch.Update(); err != nil {
 		return "", err
 	}
-	return "Bot commands enabled for this channel.", nil
+	return "Bot commands are now enabled for this channel.", nil
 }
 
 // Disable a channel for bot commands.
@@ -354,20 +354,20 @@ func (ch *ChannelInfo) Disable() (string, error) {
 			if err := ch.Update(); err != nil {
 				return "", err
 			}
-			return "Bot commands have been disabled here.", nil
+			return "Bot commands have been disabled for this channel.", nil
 		}
 		return "", err
 	}
 
 	if !ch.Enabled {
-		return "Bot commands are already disabled here.", nil
+		return "Bot commands are already disabled for this channel.", nil
 	}
 
 	ch.Enabled = false
 	if err := ch.Update(); err != nil {
 		return "", err
 	}
-	return "Bot commands have beem disabled here.", nil
+	return "Bot commands have beem disabled for this channel.", nil
 }
 
 // Check to see if a channel is eligible to do bot commands.
