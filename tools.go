@@ -163,6 +163,8 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		err = io.ChannelCore()
 	case "event", "events":
 		err = io.CoreEvent()
+	case "ticket", "tickets":
+		err = io.CoreTickets()
 	case "cmd", "command":
 		err = io.CoreDatabase()
 	case "script", "scripts":

@@ -13,7 +13,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.6.2"
+	_version       = "0.7.0"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -52,6 +52,7 @@ func init() {
 	cmds["normal"]["gen"] = "Generate a pseudo 21x21 map."
 	cmds["normal"]["sz"] = "Returns the size of a message."
 	cmds["normal"]["invite"] = "Bot invite information!"
+	cmds["normal"]["ticket"] = "Add a bug to the ticket system!"
 }
 
 // Bot Global interface for pulling discord information.

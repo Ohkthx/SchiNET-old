@@ -31,6 +31,7 @@ const (
 	CollectionAlias     = "aliases"
 	CollectionAlliances = "alliances"
 	CollectionChannels  = "channels"
+	CollectionTickets   = "tickets"
 )
 
 // DBdat passes information as to what to store into a database.
@@ -182,6 +183,19 @@ func (d *DBdat) dbGetAll(i interface{}) error {
 	return nil
 }
 
+func (d *DBdat) dbCount() (int, error) {
+	var err error
+	var n int
+	mdb := d.Handler
+
+	c := mdb.DB(d.Database).C(d.Collection)
+	if n, err = c.Count(); err != nil {
+		return -1, err
+	}
+
+	return n, nil
+}
+
 // CoreDatabase will control adding and removing user defined commands.
 func (io *IOdat) CoreDatabase() (err error) {
 
@@ -229,6 +243,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var c ChannelInfo
 		bson.Unmarshal(byt, &c)
 		return c, nil
+	case Ticket:
+		var t Ticket
+		bson.Unmarshal(byt, &t)
+		return t, nil
 	default:
 		return nil, ErrBadInterface
 	}

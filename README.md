@@ -1,4 +1,5 @@
-### Ultima-Shards Discord Bot
+# Ultima-Shards Discord Bot
+
 + Discord API: [bwmarrin/discordgo](https://github.com/bwmarrin/discordgo)
 + ~~MySQL Drivers: [my-sql-driver/mysql](https://github.com/go-sql-driver/mysql)~~
 + MongoDB Drivers: [go-mgo/mgo](https://github.com/go-mgo/mgo)
@@ -12,19 +13,24 @@ Special thanks to the wonderful developers above and their projects that has giv
 
 This is the second Discord bot that I've written with Go and using the amazing Discord API provided at the link above. The first project quickly snowballed into something much larger that initially anticipated. Being my first project in Go, I've learned many practices that are cleaner- hence the birth of the Discord Bot: Core project.
 
-### Features
-+ MongoDB support.
-+ Gambling support, based on message count.
-+ Script library.
-+ Pastebin posting via API.
-+ User Soft/Hard bans.
-+ Aliases to commands.
-+ Server Message Histograms.
-+ Permissions for bot manipulation.
-+ Events with countdown.
-+ Channel enable/disabling of bot commands by normal users.
+## Features
 
-### TODO/Reimplement List
++ MongoDB support.
++ Gambling support, based on message count. (,gamble)
++ Ticket/Bug Report system. (,ticket)
++ Script library. (,script)
++ Pastebin posting via API.
++ User Soft/Hard bans. (,ban)
++ Aliases to commands. (,alias)
++ Server Message Histograms.
++ Permissions for bot manipulation. (,permission)
++ Events with countdown. (,events)
++ Channel enable/disabling of bot commands by normal users. (,channel enable/disable)
+
+*All commands are prefixed with a ',' by default- can be changed.
+
+## TODO/Reimplement List
+
 + Support for Vita-Nex: Core API
 + ~~Support for SQL~~
 + Public and Private Notifications
@@ -43,4 +49,5 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + Script Library: Accessing via IDs
 
 ### Versions
+
 See [changelog](https://github.com/d0x1p2/usmbot/blob/master/changelog)

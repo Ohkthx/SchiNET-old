@@ -1,3 +1,9 @@
+0.7.0 - Additions:
+            - Bug Report/Ticket system implemented.
+            - dbCount() added to get list of documents in collection.
+        Fixes:
+            - README formatting updated.
+
 0.6.21 - Additions:
             - HasPermissionGTE for checking to see if user is of equal or higher than permissions.
          Fixes:
