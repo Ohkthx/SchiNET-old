@@ -7,75 +7,75 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"gopkg.in/mgo.v2"
+	"github.com/d0x1p2/godbot"
 )
 
 func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var err error
-	var c *discordgo.Channel
-	if c, err = s.Channel(m.ChannelID); err != nil {
-		fmt.Println(err)
-		return
-	}
+	var c *godbot.Channel
 
 	var io = msgToIOdat(m)
+	cfg.DSession = s
 
+	// Required for storing information in the correct database.
 	if Bot != nil {
-		// Required for storing information in the correct database.
-		io.guild = Bot.GetGuild(c.GuildID)
+		// Prevents accessing nil pointers and crashing bot.
+		if c = Bot.GetChannel(m.ChannelID); c == nil {
+			fmt.Println("Nil channel prevented.")
+			return
+		}
+
+		if io.guild = Bot.GetGuild(c.GuildID); io.guild == nil {
+			fmt.Println("Nil guild prevented.")
+			return
+		}
+	} else {
+		fmt.Println("Nil Bot... returning")
+		return
 	}
 
 	if m.Author.Bot {
 		if m.Author.ID == Bot.User.ID {
 			ts, _ := m.Timestamp.Parse()
-			if err := UserUpdateSimple(io.guild.ID, m.Author, 1, ts); err != nil {
+			if err := UserUpdateSimple(c.GuildID, m.Author, 1, ts); err != nil {
 				return
 			}
 		}
 		return
-	} else if c.IsPrivate {
+	} else if c.Type == discordgo.ChannelTypeDM {
+		// Handle private messages.
 		if strings.Contains(m.Content, ",list") {
 			s.ChannelMessageSend(c.ID, channelsTemp())
 		}
 		return
-		//fmt.Printf("Content: %s\nMentions:%s\n", m.Content, m.Mentions)
 	}
 
 	// Log message into Database
 	if _, err := messageLog(io.guild.Name, io.guild.ID, c.Name, m.Message); err != nil {
 		fmt.Println(err)
 	}
-	// End logging message
 
+	// Handle the message appropriately if it is a message between alliances.
 	cfg.AllianceHandler(m.Message)
+
+	// Handle potential WatchLogs
+	cfg.WatchLogHandler(io.guild, m, c.Name)
 
 	// Return due to not being a command and/or just an Embed.
 	if io.command == false || len(io.io) == 0 {
 		return
 	}
 
-	var u = UserNew(m.Author)
-	if err := u.Get(m.Author.ID); err != nil {
+	io.user = UserNew(m.Author)
+	if err := io.user.Get(m.Author.ID); err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	io.user = u
-
-	var tko bool
-	if io.io[0] == "takeover" {
-		tko = true
-	}
-	if ok := cfg.takeoverCheck(m.ID, m.ChannelID, io.guild.ID, m.Content, tko, u); ok {
-		return
-	} else if ok := u.HasPermission(io.guild.ID, permNormal); !ok {
-		return
-	}
-
+	// Handle the parse the various commands the message can be.
 	err = cfg.ioHandler(io)
 	if err != nil {
 		io.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)
-		//return
 	}
 	// Prevention from attempting access of null pointer from console.
 	if io.msg != nil && io.rm {
@@ -84,7 +84,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 
 	// Send message here.
 	if io.output != "" {
-		_, _ = s.ChannelMessageSend(m.ChannelID, io.output)
+		s.ChannelMessageSend(m.ChannelID, io.output)
 	} else if io.msgEmbed != nil {
 		s.ChannelMessageSendEmbed(m.ChannelID, io.msgEmbed)
 	}
@@ -92,6 +92,7 @@ func (cfg *Config) msghandler(s *discordgo.Session, m *discordgo.MessageCreate) 
 	return
 }
 
+// newUserHandler greets a new palyers to the channel.
 func (cfg *Config) newUserHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
 	if Bot != nil {
 		c := Bot.GetMainChannel(nu.GuildID)
@@ -109,8 +110,8 @@ func (cfg *Config) newUserHandler(s *discordgo.Session, nu *discordgo.GuildMembe
 	}
 }
 
+// delUserHandler notifies of a leaving user (NOT CURRENTLY WORKING)
 func delUserHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
-	fmt.Println("Got here.")
 	if Bot != nil {
 		for _, c := range Bot.Channels {
 			if c.Name == "internal" {
@@ -123,6 +124,40 @@ func delUserHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
 	}
 }
 
+// WatchLogHandler tracks if the message is under WatchLog.
+func (cfg *Config) WatchLogHandler(guild *godbot.Guild, msg *discordgo.MessageCreate, channel string) {
+
+	// Verify we have a watchlogger on this guild.
+	var watched WatchLog
+	for _, w := range cfg.watched {
+		if w.guildID == guild.ID {
+			watched = w
+			break
+		}
+	}
+
+	// Return since guild ID isn't being watched.
+	if watched.guildID == "" {
+		return
+	}
+
+	// Compose the message to send to the channel then the socket.
+	var output = "--> "
+	if watched.channelID == "" {
+		output += "[" + channel + "]"
+		// Check that we are monitoring this channel if any...
+	} else if strings.ToLower(watched.channelName) != strings.ToLower(channel) {
+		return
+	}
+
+	// Eventually add support for ContentWithMoreMentionsReplaced()
+	output += "[" + msg.Author.Username + "#" + msg.Author.Discriminator + "] " + msg.ContentWithMentionsReplaced()
+
+	// Send the composed message.
+	watched.Talk(output)
+}
+
+// messageLog logs the supplied message into a local database.
 func messageLog(database, databaseID, channel string, msg *discordgo.Message) (bool, error) {
 
 	m := MessageNew(database, databaseID, channel, msg)
@@ -138,10 +173,12 @@ func messageLog(database, databaseID, channel string, msg *discordgo.Message) (b
 	return false, nil
 }
 
-// MessageIntegrityCheck erifies the integrity of channels of a specific guild.
+// MessageIntegrityCheck verifies the integrity of channels of a specific guild.
 func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 	var gID string
 	var found bool
+
+	// Find the guild in the currently accessible guilds.
 	for _, g := range cfg.Core.Guilds {
 		if strings.Contains(g.Name, gName) {
 			gName = g.Name
@@ -151,25 +188,36 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 		}
 	}
 
+	// Return if could not be found.
 	if !found {
 		return "", errors.New("could not find guild ID")
 	}
+
 	var missed int
+	// Process all channels within the guild (that are currently linked to the guild.)
 	for _, c := range cfg.Core.Links[gID] {
+		// If the channel is not a text channel, continue to next channel.
+		if c.Type != 0 {
+			continue
+		}
+
 		var mID string
 		for {
 			var bk bool
+			// Grab 100 messages.
 			msgs, err := cfg.Core.Session.ChannelMessages(c.ID, 100, mID, "", "")
 			if err != nil {
 				return "", err
 			}
 
+			// Update amount of messages actually received, less than 100 indicates there are less than 100 available.
 			var cnt = len(msgs)
 			if cnt == 0 {
 				bk = true
 				break
 			}
 
+			// Process each message individually and log it.
 			for n, m := range msgs {
 				mID = m.ID
 
@@ -179,6 +227,7 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 					missed++
 				}
 
+				// Break early if the last message (less than 100) is processed.
 				if cnt < 100 && n+1 == cnt {
 					bk = true
 					break
@@ -199,41 +248,24 @@ func (cfg *Config) MessageIntegrityCheck(gName string) (string, error) {
 // MessageNew returns a new message object.
 func MessageNew(database, databaseID, channel string, m *discordgo.Message) *Message {
 	u := UserNew(m.Author)
-	if err := u.Get(m.Author.ID); err != nil {
-		// Most likely not found or first message.
-		u.Credits = 0
-		u.CreditsTotal = 0
-		u.LastSeen, _ = m.Timestamp.Parse()
-		u.Access = append(u.Access, Access{ServerID: databaseID, Permissions: permNormal})
-
-	} else {
-		var found bool
-		for _, a := range u.Access {
-			if a.ServerID == databaseID {
-				found = true
-			}
-		}
-
-		if !found {
-			u.Access = append(u.Access, Access{ServerID: databaseID, Permissions: permNormal})
-			if err1 := u.Update(); err1 != nil {
-				// Database error. Log error.
-			}
-		}
-	}
 
 	var ts, ets time.Time
 	var err error
 	if ts, err = m.Timestamp.Parse(); err != nil {
-		// Log error.
+		// TAG: TODO
+		// Log error that should never happen (according to the documentation)
+		// Will be logged with a logger once added.
+		fmt.Println(err)
 	}
 
 	if ets, err = m.EditedTimestamp.Parse(); err != nil {
-		// Log error.
+		// TAG: TODO
+		// Log error that should never happen (according to the documentation)
+		// Will be logged with a logger once added.
+		fmt.Println(err)
 	}
 
 	return &Message{
-		//Database:    database,
 		ID:              m.ID,
 		ChannelID:       m.ChannelID,
 		ChannelName:     channel,
@@ -241,7 +273,6 @@ func MessageNew(database, databaseID, channel string, m *discordgo.Message) *Mes
 		Timestamp:       ts,
 		EditedTimestamp: ets,
 		Author:          u.Basic(),
-		AuthorMsg:       u.CreditsTotal,
 	}
 }
 
@@ -251,8 +282,8 @@ func (m *Message) Update(database string) (bool, error) {
 	q["id"] = m.ID
 
 	db := DBdatCreate(database, CollectionMessages, m, q, nil)
-	if err := db.dbGet(Message{}); err != nil {
-		if err == mgo.ErrNotFound {
+	if err := db.dbExists(); err != nil {
+		if err == ErrNoDocument {
 			// Insert the message into the database here.
 			if err := db.dbInsert(); err != nil {
 				return false, err

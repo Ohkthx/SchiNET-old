@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 
 	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/d0x1p2/godbot"
@@ -13,19 +17,26 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.7.0"
+	_version       = "0.7.1"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
 	envPBDK        = os.Getenv("BOT_PBDevKey")
 	envPBPW        = os.Getenv("BOT_PBPW")
 	envPB          = os.Getenv("BOT_PB")
+	envBotGuild    = os.Getenv("BOT_GUILD")
 	consoleDisable bool
+	watcherEnabled bool
+	watcherPort    string
+	watcherHost    string
 	cmds           map[string]map[string]string
 )
 
 func init() {
 	flag.BoolVar(&consoleDisable, "console-disable", false, "Disable Console.")
+	flag.BoolVar(&watcherEnabled, "watcher", false, "Watch a Guild/Channel.")
+	flag.StringVar(&watcherPort, "port", "", "Port to connect on for watcher.")
+	flag.StringVar(&watcherHost, "host", "", "Host to the watcher.")
 	flag.Parse()
 
 	// Init commands.
@@ -41,6 +52,7 @@ func init() {
 	cmds["mod"]["event"] = "Add/Edit/Remove server events."
 	cmds["mod"]["alias"] = "Add/Remove command aliases."
 	cmds["mod"]["channel"] = "Enable/Disable commands in current channel."
+	cmds["mod"]["clear"] = "Clears messages from current channel. Specify a number."
 
 	cmds["normal"]["script"] = "Add/Edit/Remove scripts for the local server."
 	cmds["normal"]["event"] = "View events that are currently scheduled."
@@ -62,6 +74,17 @@ var Bot *godbot.Core
 var Mgo *mgo.Session
 
 func main() {
+
+	// If it is a watcher, just start the client and return once complete.
+	if watcherEnabled {
+		// Return if we don't have the information to connect.
+		if watcherHost == "" || watcherPort == "" {
+			return
+		}
+		clientLaunch()
+		os.Exit(0)
+	}
+
 	//var binfo bot
 	var cfg = &Config{}
 
@@ -117,11 +140,49 @@ func main() {
 	}
 }
 
+// cleanup children and stop the bot correctly.
 func (cfg *Config) cleanup() {
+	// Kill the child processes for the guilds/channels being watched.
+	for _, w := range cfg.watched {
+		w.Talk(w.pid + "die")
+	}
+
 	cfg.Core.Stop()
 	cfg.DB.Close()
-	fmt.Println("Bot stopped, exiting.")
+	fmt.Println("\nBot stopped, exiting.")
 	os.Exit(0)
+}
+
+// clientLaunch creates a new instance whose purpose is to listen for incoming messages.
+func clientLaunch() {
+	fmt.Print("Connecting to " + watcherHost + ":" + watcherPort + "... ")
+	conn, err := net.Dial("tcp", watcherHost+":"+watcherPort)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Connected!")
+	pID := strconv.Itoa(os.Getpid())
+
+	// Send our PID (childs) to the spawning (parent) process.
+	conn.Write([]byte(pID + "\n"))
+
+	fmt.Println("<-- " + "Exchanged our PID: " + pID)
+	killswitch := pID + "die"
+
+	// Print messages recieved... and break if we get the killswitch "[PID]die"
+	for {
+		message, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Print(string(message))
+		if stripWhiteSpace(string(message)) == killswitch {
+			break
+		}
+
+	}
+
+	// Close the socket and exit.
+	conn.Close()
 }
 
 // Used to verify/register default aliases.
@@ -136,7 +197,7 @@ func (cfg *Config) defaultAliases() error {
 	aliases[0] = aliasSimple{"gamble", "user --gamble -n"}
 	aliases[1] = aliasSimple{"ban", "user --ban"}
 	aliases[2] = aliasSimple{"permission", "user --permission"}
-	aliases[3] = aliasSimple{"xfer", "user --xfer "}
+	aliases[3] = aliasSimple{"xfer", "user --xfer"}
 
 	for _, a := range aliases {
 		user := UserNew(cfg.Core.User)
@@ -148,6 +209,7 @@ func (cfg *Config) defaultAliases() error {
 	return nil
 }
 
+// newGuildHandler Handles newly added guilds that have invited the bot to the server.
 func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCreate) {
 	if Bot != nil {
 		if err := Bot.UpdateConnections(); err != nil {
@@ -162,10 +224,119 @@ func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCrea
 		}
 
 		var admin = UserNew(user.User)
+		if err := admin.Get(admin.ID); err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		// Grant Admin permissions to server Owner.
 		admin.PermissionAdd(ng.ID, permAdmin|permModerator|permNormal)
 		if err := admin.Update(); err != nil {
 			fmt.Println(err)
 			return
 		}
+
+		var guildConfig = GuildConfig{ID: ng.ID, Name: ng.Name, Init: false}
+		if err = guildConfig.Get(); err != nil {
+			if err != mgo.ErrNotFound {
+				fmt.Println("Initiating a new guild: " + err.Error())
+			}
+		}
+
+		// If it is not initated- notify the chat and the owner.
+		if guildConfig.Init == false {
+			guildConfig.Init = true
+			if err = guildConfig.Update(); err != nil {
+				fmt.Println("Saving guild... " + err.Error())
+			}
+			// Assign new nickname with current version.
+			err = Bot.SetNickname(ng.ID, fmt.Sprintf("(v%s)", _version), true)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			// Notify the main channel that the bot has been added and WHO has the ultimate admin privledges.
+			embedMsg := embedCreator(fmt.Sprintf("Hello all, nice to meet you!\n<@%s> has been given the **Admin** privledges for <@%s> on this server.\n", admin.ID, cfg.Core.User.ID), ColorYellow)
+			s.ChannelMessageSendEmbed(ng.ID, embedMsg)
+
+			// Send a greeting to the Admin informing of the addition.
+			if err := cfg.dmAdmin(s, ng.OwnerID, ng.Name); err != nil {
+				fmt.Println(err)
+			}
+		}
 	}
+}
+
+// Get a guild from DB
+func (g *GuildConfig) Get() error {
+	var q = make(map[string]interface{})
+
+	q["id"] = g.ID
+
+	var dbdat = DBdatCreate(g.Name, CollectionConfig, GuildConfig{}, q, nil)
+	err := dbdat.dbGet(GuildConfig{})
+	if err != nil {
+		return err
+	}
+
+	var guild = GuildConfig{}
+	guild = dbdat.Document.(GuildConfig)
+	*g = guild
+
+	return nil
+}
+
+// Update a guild's config.
+func (g *GuildConfig) Update() error {
+	var err error
+	var q = make(map[string]interface{})
+	var c = make(map[string]interface{})
+
+	q["id"] = g.ID
+	c["$set"] = bson.M{
+		"id":   g.ID,
+		"name": g.Name,
+		"init": g.Init,
+	}
+
+	var dbdat = DBdatCreate(g.Name, CollectionConfig, g, q, c)
+	err = dbdat.dbEdit(User{})
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			// Add to DB since it doesn't exist.
+			if err := dbdat.dbInsert(); err != nil {
+				return err
+			}
+			return nil
+		}
+		return err
+	}
+
+	return nil
+
+}
+
+// dmAdmin sends a whisper to the Admin about the newly added bot. Outfitted with minor instructions- it should help.
+func (cfg *Config) dmAdmin(s *discordgo.Session, uID, server string) error {
+	var err error
+	var msg = fmt.Sprintf("Greetings <@%s>! You have been granted **Admin** privledges for this bot for the "+
+		"**%s** server! You can grant additional permissions to other users by using the `,permission` command.\n\n"+
+		"To invoke commands, they must be entered on a server channel.\n"+
+		"An example of how to grant a moderator permission to another user:\n"+
+		"`,permission  --add  --type Moderator  --user <@%s>\n\n"+
+		"If you have additional questions, you can always use the `,help` command or join us at %s",
+		cfg.Core.User.ID, uID, server, envBotGuild)
+
+	// Create the DM channel
+	var channel *discordgo.Channel
+	channel, err = s.UserChannelCreate(uID)
+	if err != nil {
+		return err
+	}
+
+	// Send notification/Greeting over the DM channel.
+	if _, err = s.ChannelMessageSend(channel.ID, msg); err != nil {
+		return err
+	}
+	return nil
 }

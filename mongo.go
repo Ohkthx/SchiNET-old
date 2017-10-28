@@ -15,6 +15,7 @@ var (
 	ErrNilChange    = errors.New("nil change provided")
 	ErrUnknownType  = errors.New("unknown type")
 	ErrBadInterface = errors.New("bad interface, unknown in switch")
+	ErrNoDocument   = errors.New("document not found")
 	//CollectionMessages = func(c string) string { return "messages." + c }
 )
 
@@ -32,6 +33,7 @@ const (
 	CollectionAlliances = "alliances"
 	CollectionChannels  = "channels"
 	CollectionTickets   = "tickets"
+	CollectionConfig    = "config"
 )
 
 // DBdat passes information as to what to store into a database.
@@ -160,6 +162,36 @@ func (d *DBdat) dbGet(i interface{}) error {
 	return nil
 }
 
+/*
+// Potentially will replace the current find.One() method of getting documents.
+// Awaiting additional benchmarking.
+func (d *DBdat) dbGetLimit(i interface{}, count int) error {
+	var unk interface{}
+	var err error
+	if d.Query == nil {
+		return ErrNilInterface
+	}
+
+	mdb := d.Handler
+
+	c := mdb.DB(d.Database).C(d.Collection)
+	err = c.Find(d.Query).Limit(count)
+	if err != nil {
+		return err
+	}
+
+	if unk == nil {
+		return mgo.ErrNotFound
+	}
+	d.Document, err = handlerForInterface(i, unk)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+*/
+
 func (d *DBdat) dbGetAll(i interface{}) error {
 	var unk []interface{}
 	var err error
@@ -196,6 +228,26 @@ func (d *DBdat) dbCount() (int, error) {
 	return n, nil
 }
 
+func (d *DBdat) dbExists() error {
+	var err error
+	var count int
+
+	mdb := d.Handler
+	c := mdb.DB(d.Database).C(d.Collection)
+
+	count, err = c.Find(d.Query).Count()
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return ErrNoDocument
+	}
+
+	return nil
+
+}
+
 // CoreDatabase will control adding and removing user defined commands.
 func (io *IOdat) CoreDatabase() (err error) {
 
@@ -215,6 +267,10 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var a Alias
 		bson.Unmarshal(byt, &a)
 		return a, nil
+	case GuildConfig:
+		var g GuildConfig
+		bson.Unmarshal(byt, &g)
+		return g, nil
 	case Event:
 		var e Event
 		bson.Unmarshal(byt, &e)

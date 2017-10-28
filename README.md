@@ -26,11 +26,14 @@ This is the second Discord bot that I've written with Go and using the amazing D
 + Permissions for bot manipulation. (,permission)
 + Events with countdown. (,events)
 + Channel enable/disabling of bot commands by normal users. (,channel enable/disable)
++ WatchLog on Guilds and Guild Channels. Streams to a new window.
++ Console Access to modify run-time features.
 
 *All commands are prefixed with a ',' by default- can be changed.
 
 ## TODO/Reimplement List
 
++ TAG: TODO added for quick searching minor things to edit.
 + Support for Vita-Nex: Core API
 + ~~Support for SQL~~
 + Public and Private Notifications

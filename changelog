@@ -1,3 +1,25 @@
+0.7.1 - Additions:
+            - Console updates!
+                - Better console parsing.
+                - WatchLog: Watch a particular Guild/Channel and stream it to a new console.
+                - Help: Prints out currently acceptable commands that are accessible via console.
+            - Events now display in soonest -> latest order (eventSort()).
+            - Message clearing/deleting (,clear or ,delete) Can exceed the 100 limit and 14day limit.
+            - New Guilds handling improved. Notifies Main Channel and Owner of permissions assigned.
+            - Updated to be compatible with current discordgo.
+            - Improved speed on logging messages.
+            - dbExists() added to check if a document exists (instead of pulling and checking.)
+            - stripWhiteSpace() to remove all white space characters from string added.
+            - Additional Comments to further improve legibility.
+        Fixes:
+            - Permissions added for breaking Alliances.
+            - Error checking for bad times provided < 0 and  > 24.
+            - Events properly updating, rolling over, and displaying the correct time.
+            - Removed excess boiler plate from Events.
+            - Additional checks for accessing nil memory to prevent crashes.
+            - Reformatted msghandler() to be more efficient.
+            - Minor syntax fixes to the various '--help' commands.
+
 0.7.0 - Additions:
             - Bug Report/Ticket system implemented.
             - dbCount() added to get list of documents in collection.

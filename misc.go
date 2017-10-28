@@ -133,6 +133,7 @@ func Help(f *getopt.Set, prefix, suffix string) string {
 	return "```" + prefix + buf.String() + suffix + "```"
 }
 
+// channelsTemp prints all channels for a particular guild.
 func channelsTemp() string {
 	var msg string
 	msg += "```C\n"
@@ -141,13 +142,14 @@ func channelsTemp() string {
 		if strings.Contains(gg.Name, "verse") {
 			msg += fmt.Sprintf("Guild: [%s] [%s]\n", gg.Name, gg.ID)
 			for n, cc := range c {
-				msg += fmt.Sprintf("[%2d] Channel: [%16s] [%5s] [%s]\n", n, cc.Name, cc.Type, cc.ID)
+				msg += fmt.Sprintf("[%2d] Channel: [%16s] [%2d] [%s]\n", n, cc.Name, cc.Type, cc.ID)
 			}
 		}
 	}
 	return msg + "```"
 }
 
+// histograph creates a timeline of message activity within a year.
 func (io *IOdat) histograph(s *discordgo.Session) error {
 	var snd string
 	var mp = make(map[int]map[int]int)
@@ -255,11 +257,14 @@ func (io *IOdat) histograph(s *discordgo.Session) error {
 	return nil
 }
 
+// roomGen generates a room for an RPG that will be integrated.
+// TAG: TODO
 func (io *IOdat) roomGen() {
 	d := generate.NewDungeon()
 	io.output = "```\n" + d.String() + "```"
 }
 
+// monToString converts a month int, to a 3 letter string.
 func monToString(i int) string {
 	switch i {
 	case 1:

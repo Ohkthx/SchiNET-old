@@ -64,7 +64,7 @@ func (cfg *Config) CoreAlliance(io *IOdat) error {
 		name = strings.ToLower(name)
 	}
 
-	// Handle 'list' and 'help'
+	// Handle the various commands: LIST, HELP, INIT, AND DELETE
 	if list {
 		io.msgEmbed = embedCreator(cfg.Core.GuildsString(), ColorBlue)
 		return nil
@@ -79,6 +79,9 @@ func (cfg *Config) CoreAlliance(io *IOdat) error {
 		io.msgEmbed = embedCreator(passkey, ColorGreen)
 		return nil
 	} else if delete {
+		if ok := io.user.HasPermissionGTE(io.guild.Name, permModerator); !ok {
+			return ErrBadPermissions
+		}
 		if err := cfg.AllianceBreak(name); err != nil {
 			return err
 		}
@@ -223,13 +226,11 @@ func (cfg *Config) AllianceHandler(m *discordgo.Message) error {
 		return nil
 	}
 
-	var rcvID string //, rcvName string
+	var rcvID string
 	if ally.PartyA.ChannelID == cID {
 		rcvID = ally.Party1.ChannelID
-		//rcvName = ally.Party1.GuildName
 	} else {
 		rcvID = ally.PartyA.ChannelID
-		//rcvName = ally.PartyA.GuildName
 	}
 
 	// Scan for @mentions

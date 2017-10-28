@@ -60,11 +60,17 @@ func (io *IOdat) CoreEvent() error {
 		io.output = Help(fl, prefix, suffix)
 		return nil
 	} else if list {
-		ev := EventNew(io.guild.Name, "", "", "", io.user, false)
+		var err error
+		var ev *Event
+		if ev, err = EventNew(io.guild.Name, "", "", "", io.user, false); err != nil {
+			return err
+		}
+
 		msg, err := ev.List()
 		if err != nil {
 			return err
 		}
+
 		io.output = msg
 		return nil
 	}
@@ -73,9 +79,12 @@ func (io *IOdat) CoreEvent() error {
 		if ok := io.user.HasPermission(io.guild.ID, permAdmin); !ok {
 			return ErrBadPermissions
 		}
-		ev := EventNew(io.guild.Name, comment, day, time, io.user, persist)
-
 		var err error
+		var ev *Event
+		if ev, err = EventNew(io.guild.Name, comment, day, time, io.user, persist); err != nil {
+			return err
+		}
+
 		var msg string
 		switch {
 		case add:
@@ -89,27 +98,36 @@ func (io *IOdat) CoreEvent() error {
 			return err
 		} else if msg != "" {
 			io.msgEmbed = embedCreator(msg, ColorGreen)
+			return nil
 		}
 	}
 
-	ev := EventNew(io.guild.Name, "", "", "", io.user, false)
+	var err error
+	var ev *Event
+	if ev, err = EventNew(io.guild.Name, "", "", "", io.user, false); err != nil {
+		return err
+	}
+
 	msg, err := ev.List()
 	if err != nil {
 		return err
 	}
+
 	io.output = msg
 	return nil
 
 }
 
 // EventNew creates a new Event object that can be acted on.
-func EventNew(database, desc, day, t string, u *User, persist bool) *Event {
+func EventNew(database, desc, day, t string, u *User, persist bool) (*Event, error) {
 
-	da, _ := evDayAdd(day)
-	hhmm, _ := evHHMM(t)
-
-	now := time.Now()
-	ts := time.Date(now.Year(), now.Month(), now.Day()+da, hhmm[0], hhmm[1], 0, 0, now.Location())
+	var err error
+	var ts time.Time
+	if ts, err = evTime(day, t); err != nil {
+		if t != "" {
+			return nil, err
+		}
+	}
 
 	return &Event{
 		Server:      database,
@@ -119,7 +137,7 @@ func EventNew(database, desc, day, t string, u *User, persist bool) *Event {
 		Time:        ts,
 		Protected:   persist,
 		AddedBy:     u.Basic(),
-	}
+	}, nil
 }
 
 // Add stores an Event in the Database.
@@ -145,7 +163,8 @@ func (ev *Event) Delete() (string, error) {
 
 	var q = make(map[string]interface{})
 
-	q["$and"] = []bson.M{bson.M{"day": ev.Day}, bson.M{"time": ev.Time}}
+	// Create the query, get the Event.
+	q["$and"] = []bson.M{bson.M{"day": ev.Day}, bson.M{"hhmm": ev.HHMM}}
 	var dbdat = DBdatCreate(ev.Server, CollectionEvents, Event{}, q, nil)
 	if err := dbdat.dbGet(Event{}); err != nil {
 		if err == mgo.ErrNotFound {
@@ -154,6 +173,7 @@ func (ev *Event) Delete() (string, error) {
 		return "", err
 	}
 
+	// Convert and remove the Event.
 	var e = dbdat.Document.(Event)
 	if err := dbdat.dbDeleteID(e.ID); err != nil {
 		return "", err
@@ -166,7 +186,7 @@ func (ev *Event) Delete() (string, error) {
 
 // List events for the local server.
 func (ev *Event) List() (string, error) {
-	var events []string
+
 	var msg string
 	var err error
 	var t = time.Now()
@@ -179,20 +199,20 @@ func (ev *Event) List() (string, error) {
 		return "", errors.New("no events scheduled for this server")
 	}
 
+	var events []EventSmall
 	msg = "Upcoming Events:```C\n"
-	for n, e := range dbdat.Documents {
+	for _, e := range dbdat.Documents {
 		cnt++
 		var ev = e.(Event)
 		dur := ev.Time.Sub(t)
 		hours := int(dur.Hours())
 
-		if hours < -12 && ev.Protected {
-			ev.Time, err = evTime(ev.Day, ev.HHMM, false)
-			if err != nil {
-				return "", err
-			}
+		// If the event is 23 hours old and protected-
+		if hours < -23 && ev.Protected {
+			ev.Time = evNextTime(ev.Time)
 			dur = ev.Time.Sub(t)
 			hours = int(dur.Hours())
+
 			// Update Database here with new time.
 			var q = make(map[string]interface{})
 			var c = make(map[string]interface{})
@@ -204,7 +224,8 @@ func (ev *Event) List() (string, error) {
 				return "", err
 			}
 
-		} else if hours < -12 {
+			// Delete the event if it is not protected and near a full day old.
+		} else if hours < -23 {
 			// Delete from Database here.
 			err := dbdat.dbDeleteID(ev.ID)
 			if err != nil {
@@ -212,23 +233,36 @@ func (ev *Event) List() (string, error) {
 			}
 			continue
 		}
-		minutes := int(dur.Minutes()) % 60
-		events = append(events, ev.Description)
 
+		minutes := int(dur.Minutes()) % 60
+		if minutes < 0 {
+			minutes = 60 + minutes
+		}
+
+		// Add it to our list of events to process for sorting.
+		events = append(events, EventSmall{Hours: hours, Minutes: minutes, Time: ev.Time, Description: ev.Description})
+	}
+
+	for i := 0; i < len(events); i++ {
+		eventSort(events)
+	}
+
+	for n, e := range events {
 		minT := "minutes"
 		hourT := "hours"
-		if minutes < 2 && minutes > -2 {
+		if e.Minutes < 2 && e.Minutes > -2 {
 			minT = "minute"
 		}
-		if hours < 2 && hours > -2 {
+		if e.Hours < 2 && e.Hours > -2 {
 			hourT = "hour"
 		}
 
-		event := fmt.Sprintf("[%d]  %3d %5s %2d %7s ->  %8s - %s CST\n", n, hours, hourT, minutes, minT, ev.Time.Weekday().String(), ev.Time.Format("15:04"))
+		event := fmt.Sprintf("[%d]  %3d %5s %2d %7s ->  %9s - %s CST\n", n, e.Hours, hourT, e.Minutes, minT, e.Time.Weekday().String(), e.Time.Format("15:04"))
 		msg += event
 	}
+
 	for n, e := range events {
-		msg += fmt.Sprintf("\n[%d] -> %s", n, e)
+		msg += fmt.Sprintf("\n[%d] -> %s", n, e.Description)
 	}
 
 	if cnt == 0 {
@@ -237,42 +271,6 @@ func (ev *Event) List() (string, error) {
 	msg += "```"
 
 	return msg, nil
-}
-
-// Converts a weekday to a number.
-func evDayAdd(wd string) (int, error) {
-	var num, alt, dayAdd int
-	now := time.Now()
-
-	switch strings.ToLower(wd) {
-	case "sunday":
-		num = 0
-		alt = 7
-	case "monday":
-		num = 1
-	case "tuesday":
-		num = 2
-	case "wednesday":
-		num = 3
-	case "thursday":
-		num = 4
-	case "friday":
-		num = 5
-	case "saturday":
-		num = 6
-	default:
-		return 0, ErrBadWeekday
-	}
-
-	if num < int(now.Weekday()) {
-		dayAdd = alt - int(now.Weekday())
-	} else if num > int(now.Weekday()) {
-		dayAdd = num - int(now.Weekday())
-	} else {
-		dayAdd = 0
-	}
-
-	return dayAdd, nil
 }
 
 // Converts a time string.
@@ -284,37 +282,67 @@ func evHHMM(hhmms string) ([2]int, error) {
 	hm[0], err = strconv.Atoi(hhmm[0])
 	if err != nil {
 		return hm, ErrBadTime
+	} else if hm[0] > 24 || hm[0] < 0 {
+		// Verify it is a good hour provided.
+		return hm, ErrBadTime
 	}
+
 	hm[1], err = strconv.Atoi(hhmm[1])
 	if err != nil {
+		return hm, ErrBadTime
+	} else if hm[1] > 60 || hm[1] < 0 {
+		// Verify it is a good minute provided.
 		return hm, ErrBadTime
 	}
 
 	return hm, nil
 }
 
-func evTime(wd, hhmms string, rollover bool) (time.Time, error) {
-	t := time.Now()
-	var da int
+// evTime converts a potentially expiring time and updates it to the next.
+func evTime(weekday, hhmms string) (time.Time, error) {
+	now := time.Now()
 	var err error
 
 	hhmm, err := evHHMM(hhmms)
 	if err != nil {
-		return t, err
+		return now, err
 	}
 
-	if rollover {
-		if hhmm[0] < 12 {
-			da = 7
-		} else {
-			da = 6
-		}
-	} else {
-		da, err = evDayAdd(wd)
-		if err != nil {
-			return t, err
-		}
+	// Get the next occurence (weekday) this event will happen.
+	var future = time.Date(now.Year(), now.Month(), now.Day(), hhmm[0], hhmm[1], 0, 0, now.Location())
+	var date = now.Day()
+	for strings.ToLower(future.Weekday().String()) != strings.ToLower(weekday) {
+		date++
+		future = time.Date(now.Year(), now.Month(), date, hhmm[0], hhmm[1], 0, 0, now.Location())
 	}
 
-	return time.Date(t.Year(), t.Month(), t.Day()+da, hhmm[0], hhmm[1], 0, 0, t.Location()), nil
+	return future, nil
+}
+
+// evNextTime adds 7 days to the current day.
+func evNextTime(ts time.Time) time.Time {
+	now := time.Now()
+	if ts.Before(now) {
+		return ts.AddDate(0, 0, 7)
+	}
+	return ts
+}
+
+// eventSort just sorts events based on time.
+func eventSort(events []EventSmall) {
+	var firstIndex = 0
+	var secondIndex = 1
+
+	for secondIndex < len(events) {
+		var firstEvent = events[firstIndex]
+		var secondEvent = events[secondIndex]
+
+		if firstEvent.Time.After(secondEvent.Time) {
+			events[firstIndex] = secondEvent
+			events[secondIndex] = firstEvent
+		}
+
+		firstIndex++
+		secondIndex++
+	}
 }

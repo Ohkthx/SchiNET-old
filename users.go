@@ -50,19 +50,20 @@ var (
 	ErrBanNotFound    = errors.New("ban not found to clear")
 
 	banSyntaxHard   = ",ban  --type hard  --user \"@Username\"\n"
-	banSyntaxSoft   = ",ban  --type soft  --user \"@Username\"   -c \"Bug Exploits\"\n"
-	banSyntaxRemove = ",ban  --type hard  --user \"@Username\"   --remove\n"
+	banSyntaxSoft   = ",ban  --type soft  --user \"@Username\"  -c \"Bug Exploits\"\n"
+	banSyntaxRemove = ",ban  --type hard  --user \"@Username\"  --remove\n"
 	banSyntaxAll    = banSyntaxHard + banSyntaxSoft + banSyntaxRemove
 
-	permSyntaxAdd    = ",permission   --add       --type \"Permission\"   --user \"@Username\"\n"
-	permSyntaxRemove = ",permission   --remove    --type \"Permission\"   --user \"@Username\"\n"
-	permSyntaxAll    = "\n\n" + permSyntaxAdd + permSyntaxRemove
+	permSyntaxAdd    = ",permission  --add     --type \"Permission\"  --user \"@Username\"\n"
+	permSyntaxRemove = ",permission  --remove  --type \"Permission\"  --user \"@Username\"\n"
+	permSyntaxTypes  = "Permission Types:\nAdmin  Moderator  Base(default)"
+	permSyntaxAll    = "\n\n" + permSyntaxAdd + permSyntaxRemove + permSyntaxTypes
 
-	userSyntaxUser       = ",user   --user \"@Username\"\n"
-	userSyntaxGamble     = ",user   --gamble   -n 100\n"
-	userSyntaxBan        = ",user   --ban   --type soft   --user \"@Username\"\n"
-	userSyntaxXfer       = ",user   -x   --user \"@Username\"   -n 100\n"
-	userSyntaxPermission = ",user   --permission   --add   --type \"mod\"   --user \"@Username\"\n"
+	userSyntaxUser       = ",user  --user \"@Username\"\n"
+	userSyntaxGamble     = ",user  --gamble  -n 100\n"
+	userSyntaxBan        = ",user  --ban  --type soft  --user \"@Username\"\n"
+	userSyntaxXfer       = ",user  -x  --user \"@Username\"  -n 100\n"
+	userSyntaxPermission = ",user  --permission  --add  --type \"mod\"  --user \"@Username\"\n"
 	userSyntaxAll        = "\n\n" + userSyntaxUser + userSyntaxBan + userSyntaxGamble + userSyntaxPermission + userSyntaxXfer
 )
 

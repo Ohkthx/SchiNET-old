@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os/exec"
 	"sync"
 
 	mgo "gopkg.in/mgo.v2"
@@ -14,12 +15,17 @@ import (
 
 // Config holds information that needs to be readily accessible.
 type Config struct {
-	Takeover   bool
-	TakeoverID string
-	Core       *godbot.Core
-	DB         *mgo.Session
-	Alliances  []Alliance
-	pending    []Alliance // Pending alliances.
+	Core     *godbot.Core
+	DB       *mgo.Session
+	DSession *discordgo.Session
+
+	// Alliance slices
+	Alliances []Alliance
+	pending   []Alliance // Pending alliances.
+
+	// Watched Guilds/Channels
+	watched  []WatchLog
+	children []*exec.Cmd
 }
 
 // Bot is a wrapper for the godbot.Core
@@ -43,6 +49,13 @@ type IOdat struct {
 	msgEmbed *discordgo.MessageEmbed
 }
 
+// GuildConfig is used to save basic information regarding if a guild is active or not.
+type GuildConfig struct {
+	ID   string
+	Name string
+	Init bool
+}
+
 // Message holds basic information related to a specific message.
 type Message struct {
 	ID              string
@@ -53,7 +66,7 @@ type Message struct {
 	Timestamp       time.Time
 	EditedTimestamp time.Time
 	Author          UserBasic
-	AuthorMsg       int
+	// AuthorMsg       int   // Removed for now (was message count)
 }
 
 // Event has information regarding upcoming events.
@@ -66,6 +79,14 @@ type Event struct {
 	Time        time.Time
 	Protected   bool
 	AddedBy     UserBasic
+}
+
+// EventSmall -er version of Events.
+type EventSmall struct {
+	Hours       int
+	Minutes     int
+	Time        time.Time
+	Description string
 }
 
 // User is a wrapper with additional functionality.
@@ -131,4 +152,17 @@ type Alias struct {
 	Caller  string        // String that calls the alias.
 	Linked  string        // What the real command is.
 	AddedBy UserBasic     // Person who added alias.
+}
+
+// WatchLog holds basic information about a channel/server to be watched.
+type WatchLog struct {
+	guildID   string
+	guildName string
+
+	channelID   string
+	channelName string
+
+	channel chan string
+	pid     string
+	port    int
 }

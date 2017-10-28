@@ -67,6 +67,16 @@ func strToCommands(io string) (bool, []string) {
 	return cmd, slice
 }
 
+// stripWhiteSpace cleans up nasty strings full of whitespace!.
+func stripWhiteSpace(text string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, text)
+}
+
 func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
 	var io IOdat
 	u := msg.Author
@@ -169,6 +179,8 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		err = io.CoreDatabase()
 	case "script", "scripts":
 		err = io.CoreLibrary()
+	case "clear", "delete":
+		err = io.messageClear(cfg.DSession)
 	case "echo":
 		io.output = strings.Join(io.io[1:], " ")
 		return
@@ -185,44 +197,76 @@ func embedCreator(description string, color int) *discordgo.MessageEmbed {
 	}
 }
 
-func (cfg *Config) takeoverCheck(mID, cID, gID, content string, toggle bool, u *User) bool {
-	s := cfg.Core.Session
-	if toggle {
-		if ok := u.HasPermission(gID, permAscended); ok {
-			cfg.textTakeoverToggle(u.ID)
-			s.ChannelMessageSend(cID, fmt.Sprintf("Takover enabled: %s", strconv.FormatBool(cfg.Takeover)))
-			return true
+// messageClear removes X number of messages from the current server.
+// TAG: TODO - support for the 100 message deleter (quicker)
+func (io *IOdat) messageClear(s *discordgo.Session) error {
+	channelID := io.msg.ChannelID
+	messageID := io.msg.ID
+
+	// Need permModerator to remove.
+	if ok := io.user.HasPermission(io.guild.ID, permModerator); !ok {
+		return ErrBadPermissions
+	}
+
+	// Validate a good number is provided.
+	if len(io.io) < 2 {
+		return errors.New("Invalid number provided")
+	}
+
+	var err error
+	var amount int
+	if amount, err = strconv.Atoi(io.io[1]); err != nil {
+		return err
+	}
+
+	// Delete the message that calls for deleting others.
+	if err = s.ChannelMessageDelete(channelID, messageID); err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	var msgs []*discordgo.Message
+	// While we have messages to delete, pull and remove.
+	for amount > 0 {
+		var toGet int
+		if amount > 100 {
+			toGet = 100
+		} else {
+			toGet = amount
 		}
-	} else if cfg.Takeover && cfg.TakeoverID == u.ID {
-		s.ChannelMessageDelete(cID, mID)
-		s.ChannelMessageSend(cID, u.StringPretty()+": "+content)
-		return true
+		if msgs, err = s.ChannelMessages(channelID, toGet, messageID, "", ""); err != nil {
+			fmt.Println(err)
+			return err
+		}
+
+		for _, m := range msgs {
+			if err = s.ChannelMessageDelete(channelID, m.ID); err != nil {
+				fmt.Println(err)
+				return err
+			}
+		}
+		amount -= toGet
 	}
-	return false
+
+	//s.ChannelMessageSendEmbed(channelID, embedCreator("Messages removed.", ColorMaroon))
+
+	return nil
 }
 
-func (cfg *Config) textTakeoverToggle(uID string) {
-	if cfg.Takeover {
-		cfg.Takeover = false
-		cfg.TakeoverID = ""
-	} else {
-		cfg.Takeover = true
-		cfg.TakeoverID = uID
-	}
-}
-
+// botInvite returns information needed to add the bot to your server.
 func botInvite() string {
 	var msg string
 	msg += fmt.Sprintf(
 		"Invite me to your server!\n"+
 			"Click to Add-> %s\n\n"+
 			"Bot Support Server -> %s\n",
-		"https://discordapp.com/oauth2/authorize?&client_id=290843164892463104&scope=bot&permissions=2080898303",
-		"https://discord.gg/pk7eUwP",
+		"https://discordapp.com/oauth2/authorize?client_id=290843164892463104&scope=bot&permissions=469855422",
+		envBotGuild,
 	)
 	return msg
 }
 
+// globalHelp prints vairous helps.
 func globalHelp() string {
 	var msg = "*Most commands have a '--help' ability."
 	for t, cmd := range cmds {
@@ -234,6 +278,7 @@ func globalHelp() string {
 	return "```" + msg + "```"
 }
 
+// msgSize is a small function intended to gauge a rough size of what a discord message is.
 func msgSize(m *discordgo.Message) string {
 	var sz int
 	// Author sizes
