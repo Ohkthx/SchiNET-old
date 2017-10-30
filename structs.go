@@ -19,6 +19,9 @@ type Config struct {
 	DB       *mgo.Session
 	DSession *discordgo.Session
 
+	// Server Configs
+	GuildConf []GuildConfig
+
 	// Alliance slices
 	Alliances []Alliance
 	pending   []Alliance // Pending alliances.
@@ -34,14 +37,15 @@ type bot struct {
 	*godbot.Core
 }
 
-// IOdat is input/output processed.
-type IOdat struct {
+// IOdata is input/output processed.
+type IOdata struct {
 	//err  error // Tracking errors.
-	command bool // Flag toggling if it is a command or not.
-	rm      bool // Remove initial message.
-	io      []string
-	input   string
-	output  string
+	cmdPrefix string
+	command   bool // Flag toggling if it is a command or not.
+	rm        bool // Remove initial message.
+	io        []string
+	input     string
+	output    string
 
 	user     *User
 	guild    *godbot.Guild
@@ -51,9 +55,10 @@ type IOdat struct {
 
 // GuildConfig is used to save basic information regarding if a guild is active or not.
 type GuildConfig struct {
-	ID   string
-	Name string
-	Init bool
+	ID     string
+	Name   string
+	Init   bool
+	Prefix string // Command prefix. Defaults to: ","
 }
 
 // Message holds basic information related to a specific message.
@@ -161,6 +166,7 @@ type WatchLog struct {
 
 	channelID   string
 	channelName string
+	channelAll  bool
 
 	channel chan string
 	pid     string

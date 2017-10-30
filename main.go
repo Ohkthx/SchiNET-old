@@ -17,7 +17,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.7.1"
+	_version       = "0.7.2"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -74,7 +74,6 @@ var Bot *godbot.Core
 var Mgo *mgo.Session
 
 func main() {
-
 	// If it is a watcher, just start the client and return once complete.
 	if watcherEnabled {
 		// Return if we don't have the information to connect.
@@ -85,35 +84,44 @@ func main() {
 		os.Exit(0)
 	}
 
-	//var binfo bot
 	var cfg = &Config{}
 
 	if envToken == "" {
 		return
 	}
 
-	bot, err := godbot.New(envToken)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	cfg.Core = bot
+	var err error
+	// Connect to our Database.
 	cfg.DB, err = mgo.Dial(envDBUrl)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	bot.MessageHandler(cfg.msghandler)
-	bot.NewUserHandler(cfg.newUserHandler)
-	bot.GuildCreateHandler(cfg.newGuildHandler)
-	//bot.RemUserHandler(delUserHandler)
+	// Create a new instance of the bot.
+	bot, err := godbot.New(envToken)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	cfg.Core = bot
+
+	// Handlers for message changes and additions.
+	bot.MessageCreateHandler(cfg.messageCreateHandler)
+	bot.MessageUpdateHandler(cfg.messageUpdateHandler)
+
+	// Handlers for guild changes.
+	bot.GuildCreateHandler(cfg.guildCreateHandler)
+	bot.GuildMemberAddHandler(cfg.guildMemberAddHandler)
+	bot.GuildMemberRemoveHandler(cfg.guildMemberRemoveHandler)
+
+	// Start the bot
 	err = bot.Start()
 	if err != nil {
 		fmt.Println(err)
 	}
 
+	// Update the Nickname in all of the channels with VERSION appended.
 	for _, g := range bot.Guilds {
 		err = bot.SetNickname(g.ID, fmt.Sprintf("(v%s)", _version), true)
 		if err != nil {
@@ -121,18 +129,30 @@ func main() {
 		}
 	}
 
+	// Assign ugly globals
+	// TAG: TODO - fix this by finding an alternative.
 	Bot = bot
 	Mgo = cfg.DB
+
+	// Process the default bot command aliases.
 	if err := cfg.defaultAliases(); err != nil {
 		fmt.Println(err)
 		os.Exit(0)
 	}
 
+	// Load all alliances so that servers will be bridged correctly.
 	if err := cfg.AlliancesLoad(); err != nil {
 		fmt.Println(err)
 		cfg.cleanup()
 	}
 
+	// Load all guild configurations to remove frequent database access per message.
+	if err = cfg.GuildConfigLoad(); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Run in either silent mode with no output (for background) or with interactive console.
 	if !consoleDisable {
 		cfg.core()
 	} else {
@@ -209,8 +229,8 @@ func (cfg *Config) defaultAliases() error {
 	return nil
 }
 
-// newGuildHandler Handles newly added guilds that have invited the bot to the server.
-func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCreate) {
+// guildCreateHandler Handles newly added guilds that have invited the bot to the server.
+func (cfg *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.GuildCreate) {
 	if Bot != nil {
 		if err := Bot.UpdateConnections(); err != nil {
 			fmt.Println(err)
@@ -236,7 +256,7 @@ func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCrea
 			return
 		}
 
-		var guildConfig = GuildConfig{ID: ng.ID, Name: ng.Name, Init: false}
+		var guildConfig = GuildConfig{ID: ng.ID, Name: ng.Name, Init: false, Prefix: envCMDPrefix}
 		if err = guildConfig.Get(); err != nil {
 			if err != mgo.ErrNotFound {
 				fmt.Println("Initiating a new guild: " + err.Error())
@@ -246,12 +266,14 @@ func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCrea
 		// If it is not initated- notify the chat and the owner.
 		if guildConfig.Init == false {
 			guildConfig.Init = true
-			if err = guildConfig.Update(); err != nil {
-				fmt.Println("Saving guild... " + err.Error())
+
+			// Update/Add guild to database and current running config.
+			if err = cfg.GuildConfigManager(guildConfig); err != nil {
+				fmt.Println("Updating guild on new guild added: " + err.Error())
 			}
+
 			// Assign new nickname with current version.
-			err = Bot.SetNickname(ng.ID, fmt.Sprintf("(v%s)", _version), true)
-			if err != nil {
+			if err = Bot.SetNickname(ng.ID, fmt.Sprintf("(v%s)", _version), true); err != nil {
 				fmt.Println(err)
 			}
 
@@ -267,13 +289,76 @@ func (cfg *Config) newGuildHandler(s *discordgo.Session, ng *discordgo.GuildCrea
 	}
 }
 
+// GuildConfigLoad loads guild configs into memory for quicker access.
+func (cfg *Config) GuildConfigLoad() error {
+
+	// Scan current guilds
+	for _, g := range cfg.Core.Guilds {
+		var gc = GuildConfig{ID: g.ID}
+		if err := gc.Get(); err != nil {
+			if err == mgo.ErrNotFound {
+				gc.Name = g.Name
+				gc.Prefix = envCMDPrefix
+				if err = gc.Update(); err != nil {
+					return err
+				}
+				return nil
+			}
+			return err
+		}
+
+		// Add it to the current config structure
+		// TAG: TODO - it's updating into DB in GuildConfigManager- potentially remove.
+		if err := cfg.GuildConfigManager(gc); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GuildConfigManager will append guilds if they're not already in the running config.
+func (cfg *Config) GuildConfigManager(guild GuildConfig) error {
+	// Find guild and replace with updated version.
+	for n, g := range cfg.GuildConf {
+		if g.ID == guild.ID {
+			cfg.GuildConf[n] = guild
+			if err := guild.Update(); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
+	if err := guild.Update(); err != nil {
+		return err
+	}
+
+	// Guild wasn't found, needs to be appended.
+	cfg.GuildConf = append(cfg.GuildConf, guild)
+	return nil
+}
+
+// GuildConfigByID will search the running guild configurations and return a matching instance.
+// If it isn't found, return an empty GuildConfig{}.
+func (cfg *Config) GuildConfigByID(gID string) GuildConfig {
+	// Scan the current configs.
+	for n, g := range cfg.GuildConf {
+		if g.ID == gID {
+			return cfg.GuildConf[n]
+		}
+	}
+
+	// Wasn't found- return nil. Caller should check nil value.
+	return GuildConfig{}
+}
+
 // Get a guild from DB
 func (g *GuildConfig) Get() error {
 	var q = make(map[string]interface{})
 
 	q["id"] = g.ID
 
-	var dbdat = DBdatCreate(g.Name, CollectionConfig, GuildConfig{}, q, nil)
+	var dbdat = DBdataCreate(g.Name, CollectionConfig, GuildConfig{}, q, nil)
 	err := dbdat.dbGet(GuildConfig{})
 	if err != nil {
 		return err
@@ -281,6 +366,11 @@ func (g *GuildConfig) Get() error {
 
 	var guild = GuildConfig{}
 	guild = dbdat.Document.(GuildConfig)
+
+	if guild.Prefix == "" {
+		guild.Prefix = envCMDPrefix
+	}
+
 	*g = guild
 
 	return nil
@@ -292,14 +382,19 @@ func (g *GuildConfig) Update() error {
 	var q = make(map[string]interface{})
 	var c = make(map[string]interface{})
 
-	q["id"] = g.ID
-	c["$set"] = bson.M{
-		"id":   g.ID,
-		"name": g.Name,
-		"init": g.Init,
+	if g.Prefix == "" {
+		g.Prefix = envCMDPrefix
 	}
 
-	var dbdat = DBdatCreate(g.Name, CollectionConfig, g, q, c)
+	q["id"] = g.ID
+	c["$set"] = bson.M{
+		"id":     g.ID,
+		"name":   g.Name,
+		"init":   g.Init,
+		"prefix": g.Prefix,
+	}
+
+	var dbdat = DBdataCreate(g.Name, CollectionConfig, g, q, c)
 	err = dbdat.dbEdit(User{})
 	if err != nil {
 		if err == mgo.ErrNotFound {

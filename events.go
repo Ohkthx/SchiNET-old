@@ -28,7 +28,7 @@ const (
 )
 
 // CoreEvent handles all event related commands from input.
-func (io *IOdat) CoreEvent() error {
+func (dat *IOdata) CoreEvent() error {
 	var add, del, edit, persist, help, list bool
 	var comment, day, time string
 	time = "12:00"
@@ -45,7 +45,7 @@ func (io *IOdat) CoreEvent() error {
 	fl.FlagLong(&time, "time", 't', "Time Occuring [12:00 default]")
 	fl.FlagLong(&comment, "comment", 'c', "Event Information/Comment")
 
-	if err := fl.Getopt(io.io, nil); err != nil {
+	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
 	}
 	if fl.NArgs() > 0 {
@@ -57,12 +57,12 @@ func (io *IOdat) CoreEvent() error {
 	if help {
 		prefix := "**Need** __command__,  __day__.\n\n"
 		suffix := "\n\nExamples:\n" + eventSyntaxAll
-		io.output = Help(fl, prefix, suffix)
+		dat.output = Help(fl, prefix, suffix)
 		return nil
 	} else if list {
 		var err error
 		var ev *Event
-		if ev, err = EventNew(io.guild.Name, "", "", "", io.user, false); err != nil {
+		if ev, err = EventNew(dat.guild.Name, "", "", "", dat.user, false); err != nil {
 			return err
 		}
 
@@ -71,17 +71,17 @@ func (io *IOdat) CoreEvent() error {
 			return err
 		}
 
-		io.output = msg
+		dat.output = msg
 		return nil
 	}
 
 	if (add || edit || del) && day != "" {
-		if ok := io.user.HasPermission(io.guild.ID, permAdmin); !ok {
+		if ok := dat.user.HasPermission(dat.guild.ID, permAdmin); !ok {
 			return ErrBadPermissions
 		}
 		var err error
 		var ev *Event
-		if ev, err = EventNew(io.guild.Name, comment, day, time, io.user, persist); err != nil {
+		if ev, err = EventNew(dat.guild.Name, comment, day, time, dat.user, persist); err != nil {
 			return err
 		}
 
@@ -97,14 +97,14 @@ func (io *IOdat) CoreEvent() error {
 		if err != nil {
 			return err
 		} else if msg != "" {
-			io.msgEmbed = embedCreator(msg, ColorGreen)
+			dat.msgEmbed = embedCreator(msg, ColorGreen)
 			return nil
 		}
 	}
 
 	var err error
 	var ev *Event
-	if ev, err = EventNew(io.guild.Name, "", "", "", io.user, false); err != nil {
+	if ev, err = EventNew(dat.guild.Name, "", "", "", dat.user, false); err != nil {
 		return err
 	}
 
@@ -113,7 +113,7 @@ func (io *IOdat) CoreEvent() error {
 		return err
 	}
 
-	io.output = msg
+	dat.output = msg
 	return nil
 
 }
@@ -143,7 +143,7 @@ func EventNew(database, desc, day, t string, u *User, persist bool) (*Event, err
 // Add stores an Event in the Database.
 func (ev *Event) Add() (string, error) {
 
-	dbdat := DBdatCreate(ev.Server, CollectionEvents, ev, nil, nil)
+	dbdat := DBdataCreate(ev.Server, CollectionEvents, ev, nil, nil)
 	if err := dbdat.dbInsert(); err != nil {
 		return "", err
 	}
@@ -165,7 +165,7 @@ func (ev *Event) Delete() (string, error) {
 
 	// Create the query, get the Event.
 	q["$and"] = []bson.M{bson.M{"day": ev.Day}, bson.M{"hhmm": ev.HHMM}}
-	var dbdat = DBdatCreate(ev.Server, CollectionEvents, Event{}, q, nil)
+	var dbdat = DBdataCreate(ev.Server, CollectionEvents, Event{}, q, nil)
 	if err := dbdat.dbGet(Event{}); err != nil {
 		if err == mgo.ErrNotFound {
 			return "", fmt.Errorf("event not found: %s -> %s", ev.Day, ev.HHMM)
@@ -192,7 +192,7 @@ func (ev *Event) List() (string, error) {
 	var t = time.Now()
 	var cnt int
 
-	dbdat := DBdatCreate(ev.Server, CollectionEvents, nil, nil, nil)
+	dbdat := DBdataCreate(ev.Server, CollectionEvents, nil, nil, nil)
 	dbdat.dbGetAll(Event{})
 
 	if len(dbdat.Documents) == 0 {
@@ -218,14 +218,14 @@ func (ev *Event) List() (string, error) {
 			var c = make(map[string]interface{})
 			q["_id"] = ev.ID
 			c["$set"] = bson.M{"time": ev.Time}
-			var dbdat = DBdatCreate(ev.Server, CollectionEvents, ev, q, c)
+			var dbdat = DBdataCreate(ev.Server, CollectionEvents, ev, q, c)
 			err = dbdat.dbEdit(Event{})
 			if err != nil {
 				return "", err
 			}
 
-			// Delete the event if it is not protected and near a full day old.
 		} else if hours < -23 {
+			// Delete the event if it is not protected and near a full day old.
 			// Delete from Database here.
 			err := dbdat.dbDeleteID(ev.ID)
 			if err != nil {
@@ -235,8 +235,11 @@ func (ev *Event) List() (string, error) {
 		}
 
 		minutes := int(dur.Minutes()) % 60
-		if minutes < 0 {
-			minutes = 60 + minutes
+		// If hours is less than 0, it will display: -1 hour, 30 minutes instead of -1hour, -30minutes.
+		if hours < 0 {
+			if minutes < 0 {
+				minutes = 60 + minutes
+			}
 		}
 
 		// Add it to our list of events to process for sorting.
@@ -257,7 +260,7 @@ func (ev *Event) List() (string, error) {
 			hourT = "hour"
 		}
 
-		event := fmt.Sprintf("[%d]  %3d %5s %2d %7s ->  %9s - %s CST\n", n, e.Hours, hourT, e.Minutes, minT, e.Time.Weekday().String(), e.Time.Format("15:04"))
+		event := fmt.Sprintf("[%d]  %4d %5s %3d %7s ->  %9s - %s CST\n", n, e.Hours, hourT, e.Minutes, minT, e.Time.Weekday().String(), e.Time.Format("15:04"))
 		msg += event
 	}
 

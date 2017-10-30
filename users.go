@@ -78,23 +78,23 @@ const (
 const permAll = permAdmin | permModerator | permAscended | permNormal
 
 // CoreUser processes all user-related commands.
-func (io *IOdat) CoreUser() error {
-	u := io.user
+func (dat *IOdata) CoreUser() error {
+	u := dat.user
 	var uflags userFlags
 	var all bool
 
-	for n, s := range io.io {
+	for n, s := range dat.io {
 		if s == "-n" {
-			if n+1 <= len(io.io)-1 {
-				if io.io[n+1] == "all" {
-					io.io = append(io.io[:n], io.io[n+2:]...)
+			if n+1 <= len(dat.io)-1 {
+				if dat.io[n+1] == "all" {
+					dat.io = append(dat.io[:n], dat.io[n+2:]...)
 					all = true
 					uflags.All = true
 				} else {
 					break
 				}
 			} else {
-				io.io = append(io.io, "0")
+				dat.io = append(dat.io, "0")
 			}
 		}
 	}
@@ -124,7 +124,7 @@ func (io *IOdat) CoreUser() error {
 	// Permission related.
 	fl.FlagLong(&uflags.Permission, "permission", 'p', "Permission Modification")
 
-	if err := fl.Getopt(io.io, nil); err != nil {
+	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
 	}
 	if fl.NArgs() > 0 {
@@ -135,19 +135,19 @@ func (io *IOdat) CoreUser() error {
 
 	uflags.flag = fl
 	uflags.User = userIDClean(uflags.User)
-	uflags.server = io.guild.ID
+	uflags.server = dat.guild.ID
 
 	var msg string
 	var err error
 	switch {
 	case uflags.Ban:
-		msg, err = u.Ban(io.msg.ChannelID, uflags)
+		msg, err = u.Ban(dat.msg.ChannelID, uflags)
 	case uflags.Xfer:
 		msg, err = u.Transfer(uflags.Amount, uflags.User)
 	case uflags.Gamble:
 		if uflags.All {
 			uflags.Amount = u.Credits
-		} else if len(io.io) < 4 {
+		} else if len(dat.io) < 4 {
 			return ErrBadArgs
 		}
 		msg, err = u.Gamble(uflags.Amount)
@@ -155,7 +155,7 @@ func (io *IOdat) CoreUser() error {
 		msg, err = u.Permission(uflags)
 	default:
 		if uflags.Help {
-			io.output = Help(fl, "", userSyntaxAll)
+			dat.output = Help(fl, "", userSyntaxAll)
 			return nil
 		} else if uflags.User != "" {
 			// Get user information
@@ -163,11 +163,11 @@ func (io *IOdat) CoreUser() error {
 			if err := user.Get(uflags.User); err != nil {
 				return err
 			}
-			io.msgEmbed = user.EmbedCreate()
+			dat.msgEmbed = user.EmbedCreate()
 			return nil
 		} else {
 			// Return current User
-			io.msgEmbed = u.EmbedCreate()
+			dat.msgEmbed = u.EmbedCreate()
 			return nil
 		}
 	}
@@ -176,7 +176,7 @@ func (io *IOdat) CoreUser() error {
 		return err
 	}
 
-	io.msgEmbed = embedCreator(msg, ColorBlue)
+	dat.msgEmbed = embedCreator(msg, ColorBlue)
 	return nil
 }
 
@@ -254,7 +254,7 @@ func (u *User) Update() error {
 		"lastseen":     u.LastSeen,
 	}
 
-	var dbdat = DBdatCreate(Database, CollectionUsers, u, q, c)
+	dbdat := DBdataCreate(Database, CollectionUsers, u, q, c)
 	err = dbdat.dbEdit(User{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -276,7 +276,7 @@ func (u *User) Get(uID string) error {
 
 	q["id"] = uID
 
-	var dbdat = DBdatCreate(Database, CollectionUsers, User{}, q, nil)
+	dbdat := DBdataCreate(Database, CollectionUsers, User{}, q, nil)
 	err := dbdat.dbGet(User{})
 	if err != nil {
 		return err
@@ -295,7 +295,7 @@ func (u *User) GetByName(username string) error {
 
 	q["username"] = username
 
-	var dbdat = DBdatCreate(Database, CollectionUsers, User{}, q, nil)
+	dbdat := DBdataCreate(Database, CollectionUsers, User{}, q, nil)
 	err := dbdat.dbGet(User{})
 	if err != nil {
 		return err
@@ -583,7 +583,7 @@ func (b *Ban) Get(database string) error {
 	var q = make(map[string]interface{})
 	q["user.id"] = b.User.ID
 
-	dbdat := DBdatCreate(database, CollectionBlacklist, Ban{}, q, nil)
+	dbdat := DBdataCreate(database, CollectionBlacklist, Ban{}, q, nil)
 	err := dbdat.dbGet(Ban{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -594,15 +594,7 @@ func (b *Ban) Get(database string) error {
 
 	var ban Ban
 	ban = dbdat.Document.(Ban)
-	if len(ban.Channels) > 0 {
-		for _, c := range ban.Channels {
-			b.Channels = append(b.Channels, c)
-		}
-	}
-
-	b.User = ban.User
-	b.Amount = ban.Amount
-	b.Last = ban.Last
+	*b = ban
 
 	return nil
 }
@@ -619,7 +611,7 @@ func (b *Ban) Update(database string) error {
 		"last":     b.Last,
 	}
 
-	dbdat := DBdatCreate(database, CollectionBlacklist, b, q, c)
+	dbdat := DBdataCreate(database, CollectionBlacklist, b, q, c)
 	err := dbdat.dbEdit(Ban{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -637,7 +629,7 @@ func (b *Ban) Update(database string) error {
 func banList(database, id string) (string, error) {
 	var msg string
 
-	db := DBdatCreate(database, CollectionBlacklist, Ban{}, nil, nil)
+	db := DBdataCreate(database, CollectionBlacklist, Ban{}, nil, nil)
 	if err := db.dbGetAll(Ban{}); err != nil {
 		return "", err
 	}
@@ -859,11 +851,11 @@ func (u *User) Permission(fl userFlags) (string, error) {
 }
 
 // HasPermission returns True if have permissions for action, false if not.
-func (u *User) HasPermission(server string, access int) bool {
+func (u *User) HasPermission(serverID string, access int) bool {
 	var found bool
 	var loc int
 	for n, s := range u.Access {
-		if s.ServerID == server {
+		if s.ServerID == serverID {
 			found = true
 			loc = n
 		}
@@ -873,16 +865,16 @@ func (u *User) HasPermission(server string, access int) bool {
 		return u.Access[loc].Permissions&access == access
 	}
 
-	u.Access = append(u.Access, Access{ServerID: server, Permissions: permNormal})
+	u.Access = append(u.Access, Access{ServerID: serverID, Permissions: permNormal})
 	return false
 }
 
 // HasPermissionGTE to what is suppled. (Greater Than or Equal)
-func (u *User) HasPermissionGTE(server string, access int) bool {
+func (u *User) HasPermissionGTE(serverID string, access int) bool {
 	var found bool
 	var loc int
 	for n, s := range u.Access {
-		if s.ServerID == server {
+		if s.ServerID == serverID {
 			found = true
 			loc = n
 		}
@@ -896,28 +888,28 @@ func (u *User) HasPermissionGTE(server string, access int) bool {
 }
 
 // PermissionAdd upgrades a user to new permissions
-func (u *User) PermissionAdd(server string, access int) {
+func (u *User) PermissionAdd(serverID string, access int) {
 	for n, s := range u.Access {
-		if s.ServerID == server {
+		if s.ServerID == serverID {
 			u.Access[n].Permissions |= access
 			return
 		}
 	}
 
-	u.Access = append(u.Access, Access{ServerID: server, ServerName: "", Permissions: permNormal | access})
+	u.Access = append(u.Access, Access{ServerID: serverID, ServerName: "", Permissions: permNormal | access})
 	return
 }
 
 // PermissionDelete strips a permission from an User
-func (u *User) PermissionDelete(server string, access int) {
+func (u *User) PermissionDelete(serverID string, access int) {
 	for n, s := range u.Access {
-		if s.ServerID == server {
+		if s.ServerID == serverID {
 			u.Access[n].Permissions ^= access
 			return
 		}
 	}
 
-	newPerm := Access{ServerID: server, ServerName: "", Permissions: permNormal}
+	newPerm := Access{ServerID: serverID, ServerName: "", Permissions: permNormal}
 	newPerm.Permissions ^= access
 	u.Access = append(u.Access, newPerm)
 
@@ -925,15 +917,15 @@ func (u *User) PermissionDelete(server string, access int) {
 }
 
 // PermissionSet assigns a specific access level.
-func (u *User) PermissionSet(server string, access int) {
+func (u *User) PermissionSet(serverID string, access int) {
 	for n, s := range u.Access {
-		if s.ServerID == server {
+		if s.ServerID == serverID {
 			u.Access[n].Permissions = access
 			return
 		}
 	}
 
-	newPerm := Access{ServerID: server, ServerName: "", Permissions: access}
+	newPerm := Access{ServerID: serverID, ServerName: "", Permissions: access}
 	u.Access = append(u.Access, newPerm)
 
 	return

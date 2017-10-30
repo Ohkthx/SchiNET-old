@@ -67,7 +67,7 @@ type Script struct {
 }
 
 // CoreLibrary handles all script/library requests.
-func (io *IOdat) CoreLibrary() error {
+func (dat *IOdata) CoreLibrary() error {
 	var err error
 	var msg string
 
@@ -75,7 +75,7 @@ func (io *IOdat) CoreLibrary() error {
 	var version float32
 	var user, name string
 
-	lib := LibraryNew(io.guild.Name, io.msg.Attachments)
+	lib := LibraryNew(dat.guild.Name, dat.msg.Attachments)
 
 	fl := getopt.New()
 
@@ -89,7 +89,7 @@ func (io *IOdat) CoreLibrary() error {
 	fl.FlagLong(&list, "list", 'l', "List all script in Library")
 	fl.FlagLong(&help, "help", 'h', "Help")
 
-	if err := fl.Getopt(io.io, nil); err != nil {
+	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
 	}
 	if fl.NArgs() > 0 {
@@ -98,14 +98,14 @@ func (io *IOdat) CoreLibrary() error {
 		}
 	}
 
-	lib.Script = ScriptNew(name, "", version, io.user.Basic())
+	lib.Script = ScriptNew(name, "", version, dat.user.Basic())
 
 	if (add || edit) && name != "" {
 		msg, err = lib.Add()
 	} else if remove && name != "" {
 		// Ability to delete as a moderator with specifying the --user flag.
 		if user != "" {
-			if ok := io.user.HasPermission(io.guild.ID, permModerator); !ok {
+			if ok := dat.user.HasPermission(dat.guild.ID, permModerator); !ok {
 				return ErrBadPermissions
 			}
 			lib.Script.Author.Name = user
@@ -116,7 +116,7 @@ func (io *IOdat) CoreLibrary() error {
 		msg, err = lib.Get()
 	} else if list {
 		// List scripts in Database.
-		io.output, err = lib.List()
+		dat.output, err = lib.List()
 		if err != nil {
 			return err
 		}
@@ -126,11 +126,11 @@ func (io *IOdat) CoreLibrary() error {
 	if err != nil {
 		return err
 	} else if msg != "" {
-		io.msgEmbed = embedCreator(msg, ColorGreen)
+		dat.msgEmbed = embedCreator(msg, ColorGreen)
 		return nil
 	}
 
-	io.output = Help(fl, "", scriptSyntaxAll)
+	dat.output = Help(fl, "", scriptSyntaxAll)
 
 	return nil
 }
@@ -175,7 +175,7 @@ func (lib *Library) Add() (string, error) {
 			}
 
 			// Add here since doesn't exists
-			dbdat := DBdatCreate(lib.Database, CollectionScripts, lib.Script, nil, nil)
+			dbdat := DBdataCreate(lib.Database, CollectionScripts, lib.Script, nil, nil)
 			err = dbdat.dbInsert()
 			if err != nil {
 				return "", err
@@ -219,7 +219,7 @@ func (lib *Library) Edit(changes *Script) (string, error) {
 		"dateaccessed": tn,
 	}
 
-	dbdat := DBdatCreate(lib.Database, CollectionScripts, s, q, c)
+	dbdat := DBdataCreate(lib.Database, CollectionScripts, s, q, c)
 	err = dbdat.dbEdit(Script{})
 	if err != nil {
 		return "", err
@@ -252,7 +252,7 @@ func (lib *Library) Delete() (string, error) {
 	var q = make(map[string]interface{})
 
 	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
-	dbdat := DBdatCreate(lib.Database, CollectionScripts, lib.Script, q, nil)
+	dbdat := DBdataCreate(lib.Database, CollectionScripts, lib.Script, q, nil)
 	err = dbdat.dbDelete()
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -271,7 +271,7 @@ func (lib *Library) find(requested bool) (*Script, error) {
 
 	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
 
-	dbdat := DBdatCreate(lib.Database, CollectionScripts, Script{}, q, nil)
+	dbdat := DBdataCreate(lib.Database, CollectionScripts, Script{}, q, nil)
 	err := dbdat.dbGet(Script{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -317,7 +317,7 @@ func (lib *Library) Get() (string, error) {
 
 // List gets all scripts from library.
 func (lib *Library) List() (string, error) {
-	dbdat := DBdatCreate(lib.Database, CollectionScripts, Script{}, nil, nil)
+	dbdat := DBdataCreate(lib.Database, CollectionScripts, Script{}, nil, nil)
 	err := dbdat.dbGetAll(Script{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -360,7 +360,7 @@ func (lib *Library) setAccessed() error {
 		"dateaccessed": time.Now(),
 	}
 
-	dbdat := DBdatCreate(lib.Database, CollectionScripts, s, q, c)
+	dbdat := DBdataCreate(lib.Database, CollectionScripts, s, q, c)
 	err := dbdat.dbEdit(Script{})
 	if err != nil {
 		return err

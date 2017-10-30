@@ -13,6 +13,8 @@ Special thanks to the wonderful developers above and their projects that has giv
 
 This is the second Discord bot that I've written with Go and using the amazing Discord API provided at the link above. The first project quickly snowballed into something much larger that initially anticipated. Being my first project in Go, I've learned many practices that are cleaner- hence the birth of the Discord Bot: Core project.
 
+This project does capture, store, and has abilities to audit message traffic to be used for: banning, histographs, credits (currency), quotes, and more!
+
 ## Features
 
 + MongoDB support.

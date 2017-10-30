@@ -33,8 +33,8 @@ const (
 )
 
 // CoreAlias processes creating and destroying new aliases.
-func (io *IOdat) CoreAlias() error {
-	u := io.user
+func (dat *IOdata) CoreAlias() error {
+	u := dat.user
 	var help, list, add, remove bool
 	var caller, linked string
 
@@ -47,7 +47,7 @@ func (io *IOdat) CoreAlias() error {
 	fl.Flag(&caller, 'i', "Input (Alias) text")
 	fl.Flag(&linked, 'o', "Original (What it is referring to)")
 
-	if err := fl.Getopt(io.io, nil); err != nil {
+	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
 	}
 	if fl.NArgs() > 0 {
@@ -56,7 +56,7 @@ func (io *IOdat) CoreAlias() error {
 		}
 	}
 
-	if !u.HasPermission(io.guild.ID, permModerator) {
+	if !u.HasPermission(dat.guild.ID, permModerator) {
 		return ErrBadPermissions
 	}
 
@@ -75,27 +75,27 @@ func (io *IOdat) CoreAlias() error {
 			}
 			// Alias added at this point.
 			msg := fmt.Sprintf("%s added an alias. **%s** -> **%s**", u.StringPretty(), caller, linked)
-			io.msgEmbed = embedCreator(msg, ColorGreen)
+			dat.msgEmbed = embedCreator(msg, ColorGreen)
 			return nil
 		} else if remove {
 			if err := alias.Remove(); err != nil {
 				return err
 			}
 			msg := fmt.Sprintf("%s removed the **%s** alias.", u.StringPretty(), caller)
-			io.msgEmbed = embedCreator(msg, ColorMaroon)
+			dat.msgEmbed = embedCreator(msg, ColorMaroon)
 			return nil
 		}
 	} else if list {
 		var err error
 		alias := AliasNew("", "", u)
-		io.output, err = alias.List()
+		dat.output, err = alias.List()
 		if err != nil {
 			return err
 		}
 		return nil
 	}
 
-	io.output = Help(fl, "", aliasSyntaxAll)
+	dat.output = Help(fl, "", aliasSyntaxAll)
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (a *Alias) Update() error {
 		"addedby": a.AddedBy,
 	}
 
-	dbdat := DBdatCreate(a.AddedBy.Server, CollectionAlias, a, q, c)
+	dbdat := DBdataCreate(a.AddedBy.Server, CollectionAlias, a, q, c)
 	err := dbdat.dbEdit(Alias{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -138,7 +138,7 @@ func (a *Alias) Get() error {
 	var q = make(map[string]interface{})
 	q["caller"] = a.Caller
 
-	dbdat := DBdatCreate(a.AddedBy.Server, CollectionAlias, Alias{}, q, nil)
+	dbdat := DBdataCreate(a.AddedBy.Server, CollectionAlias, Alias{}, q, nil)
 	err := dbdat.dbGet(Alias{})
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func (a *Alias) Get() error {
 
 // GetAll aliases from database.
 func (a *Alias) GetAll() ([]Alias, error) {
-	db := DBdatCreate(a.AddedBy.Server, CollectionAlias, Alias{}, nil, nil)
+	db := DBdataCreate(a.AddedBy.Server, CollectionAlias, Alias{}, nil, nil)
 	if err := db.dbGetAll(Alias{}); err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (a *Alias) Remove() error {
 		return nil
 	}
 
-	db := DBdatCreate(a.AddedBy.Server, CollectionAlias, a, nil, nil)
+	db := DBdataCreate(a.AddedBy.Server, CollectionAlias, a, nil, nil)
 	if err := db.dbDeleteID(a.ID); err != nil {
 		return err
 	}
@@ -212,8 +212,8 @@ func (a *Alias) List() (string, error) {
 }
 
 // Convert a Caller to a Link and return new io.io
-func aliasConv(caller, linked, original string) []string {
-	newTxt := strings.Replace(original, caller, linked, 1)
-	_, cmds := strToCommands(newTxt)
+func aliasConv(dat *IOdata, linked string) []string {
+	newTxt := strings.Replace(dat.input, dat.io[0], linked, 1)
+	_, cmds := strToCommands(newTxt, dat.cmdPrefix)
 	return cmds
 }

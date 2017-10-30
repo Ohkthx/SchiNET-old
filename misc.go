@@ -32,33 +32,33 @@ const (
 	GraphY        = 20
 )
 
-func (io *IOdat) miscRoll() {
+func (dat *IOdata) miscRoll() {
 	var roll1, roll2 int
 	s := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(s)
 	roll1 = r.Intn(6) + 1
 	roll2 = r.Intn(6) + 1
 
-	msg := fmt.Sprintf("```*%s rolls %d, %d*```", io.user.Username, roll1, roll2)
+	msg := fmt.Sprintf("```*%s rolls %d, %d*```", dat.user.Username, roll1, roll2)
 
-	io.rm = true
-	io.output = msg
+	dat.rm = true
+	dat.output = msg
 	return
 }
 
-func (io *IOdat) miscTop10() {
+func (dat *IOdata) miscTop10() {
 	var roll int
 	s := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(s)
 
 	roll = r.Intn(100)
 	if roll <= 25 {
-		io.output = fmt.Sprintf("**%s** is top 10!", io.user.Username)
+		dat.output = fmt.Sprintf("**%s** is top 10!", dat.user.Username)
 		return
 	}
 
-	io.rm = true
-	io.output = fmt.Sprintf("**%s** is **NOT** top 10.", io.user.Username)
+	dat.rm = true
+	dat.output = fmt.Sprintf("**%s** is **NOT** top 10.", dat.user.Username)
 
 	return
 }
@@ -66,18 +66,7 @@ func (io *IOdat) miscTop10() {
 func creditsReset() (string, error) {
 	var msg = "```\nUsers reset:\n\n"
 
-	/*
-		uID := dgu.ID
-		user := UserNew(dgu)
-		if err := user.Get(uID); err != nil {
-			return "", err
-		}
-
-		if ok := user.HasPermission(permAdmin | permModerator); !ok {
-			return "", ErrBadPermissions
-		}
-	*/
-	db := DBdatCreate(Database, CollectionUsers, User{}, nil, nil)
+	db := DBdataCreate(Database, CollectionUsers, User{}, nil, nil)
 	if err := db.dbGetAll(User{}); err != nil {
 		return "", err
 	}
@@ -150,26 +139,26 @@ func channelsTemp() string {
 }
 
 // histograph creates a timeline of message activity within a year.
-func (io *IOdat) histograph(s *discordgo.Session) error {
+func (dat *IOdata) histograph(s *discordgo.Session) error {
 	var snd string
 	var mp = make(map[int]map[int]int)
 
-	if ok := io.user.HasPermission(io.guild.ID, permAdmin); !ok {
+	if ok := dat.user.HasPermission(dat.guild.ID, permAdmin); !ok {
 		return ErrBadPermissions
 	}
 
 	// Get ALL messages from Database
-	dat := DBdatCreate(io.guild.Name, CollectionMessages, Message{}, nil, nil)
-	if err := dat.dbGetAll(Message{}); err != nil {
+	data := DBdataCreate(dat.guild.Name, CollectionMessages, Message{}, nil, nil)
+	if err := data.dbGetAll(Message{}); err != nil {
 		return err
 	}
 
-	if len(dat.Documents) == 0 {
+	if len(data.Documents) == 0 {
 		return fmt.Errorf("no documents found")
 	}
 
 	var msg Message
-	for _, d := range dat.Documents {
+	for _, d := range data.Documents {
 		msg = d.(Message)
 		t := msg.Timestamp
 		if _, ok := mp[t.Year()]; !ok {
@@ -199,7 +188,7 @@ func (io *IOdat) histograph(s *discordgo.Session) error {
 		// If there isn't enough messages... skip to the next year.
 		if star == 0 {
 			snd += "\tNot enough data.\n"
-			s.ChannelMessageSend(io.msg.ChannelID, "```"+snd+"```")
+			s.ChannelMessageSend(dat.msg.ChannelID, "```"+snd+"```")
 			snd = ""
 			continue
 		}
@@ -239,7 +228,7 @@ func (io *IOdat) histograph(s *discordgo.Session) error {
 				for i := 0; i < 12; i++ {
 					snd += fmt.Sprintf(" %s ", monToString(i+1))
 				}
-				s.ChannelMessageSend(io.msg.ChannelID, fmt.Sprintf("```%s```", snd))
+				s.ChannelMessageSend(dat.msg.ChannelID, fmt.Sprintf("```%s```", snd))
 				snd = ""
 			}
 			starMax--
@@ -252,16 +241,16 @@ func (io *IOdat) histograph(s *discordgo.Session) error {
 	for n, c := range t {
 		res += fmt.Sprintf("%s: %d\n", monToString(n+1), c)
 	}
-	s.ChannelMessageSend(io.msg.ChannelID, "```"+res+"```")
+	s.ChannelMessageSend(dat.msg.ChannelID, "```"+res+"```")
 
 	return nil
 }
 
 // roomGen generates a room for an RPG that will be integrated.
 // TAG: TODO
-func (io *IOdat) roomGen() {
+func (dat *IOdata) roomGen() {
 	d := generate.NewDungeon()
-	io.output = "```\n" + d.String() + "```"
+	dat.output = "```\n" + d.String() + "```"
 }
 
 // monToString converts a month int, to a 3 letter string.
@@ -304,27 +293,27 @@ func ChannelNew(cID, gName string) *ChannelInfo {
 }
 
 // ChannelCore handler for channel operations.
-func (io *IOdat) ChannelCore() error {
+func (dat *IOdata) ChannelCore() error {
 	var err error
 	var msg string
-	var ch = ChannelNew(io.msg.ChannelID, io.guild.Name)
+	var ch = ChannelNew(dat.msg.ChannelID, dat.guild.Name)
 
-	if !io.user.HasPermissionGTE(io.guild.ID, permAdmin) {
+	if !dat.user.HasPermissionGTE(dat.guild.ID, permAdmin) {
 		return ErrBadPermissions
 	}
 
-	if len(io.io) < 2 {
+	if len(dat.io) < 2 {
 		return ErrBadArgs
-	} else if io.io[1] == "enable" {
+	} else if dat.io[1] == "enable" {
 		msg, err = ch.Enable()
-	} else if io.io[1] == "disable" {
+	} else if dat.io[1] == "disable" {
 		msg, err = ch.Disable()
 	}
 
 	if err != nil {
 		return err
 	} else if msg != "" {
-		io.msgEmbed = embedCreator(msg, ColorGray)
+		dat.msgEmbed = embedCreator(msg, ColorGray)
 		return nil
 	}
 	return ErrBadArgs
@@ -397,7 +386,7 @@ func (ch *ChannelInfo) Get() error {
 
 	q["id"] = ch.ID
 
-	var dbdat = DBdatCreate(ch.Server, CollectionChannels, ChannelInfo{}, q, nil)
+	dbdat := DBdataCreate(ch.Server, CollectionChannels, ChannelInfo{}, q, nil)
 	err := dbdat.dbGet(ChannelInfo{})
 	if err != nil {
 		return err
@@ -423,7 +412,7 @@ func (ch *ChannelInfo) Update() error {
 		"enabled": ch.Enabled,
 	}
 
-	var dbdat = DBdatCreate(ch.Server, CollectionChannels, ch, q, c)
+	dbdat := DBdataCreate(ch.Server, CollectionChannels, ch, q, c)
 	err = dbdat.dbEdit(ChannelInfo{})
 	if err != nil {
 		if err == mgo.ErrNotFound {

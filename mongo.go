@@ -36,8 +36,8 @@ const (
 	CollectionConfig    = "config"
 )
 
-// DBdat passes information as to what to store into a database.
-type DBdat struct {
+// DBdata passes information as to what to store into a database.
+type DBdata struct {
 	Handler    *mgo.Session
 	Database   string
 	Collection string
@@ -52,47 +52,47 @@ type DBHandler struct {
 	*mgo.Session
 }
 
-// DBdatCreate creates a database object used to get exchange information with mongodb
-func DBdatCreate(db, coll string, doc interface{}, q bson.M, c bson.M) *DBdat {
-	return &DBdat{Handler: Mgo, Database: dbSafe(db), Collection: coll, Document: doc, Query: q, Change: c}
+// DBdataCreate creates a database object used to get exchange information with mongodb
+func DBdataCreate(db, coll string, doc interface{}, q bson.M, c bson.M) *DBdata {
+	return &DBdata{Handler: Mgo, Database: dbSafe(db), Collection: coll, Document: doc, Query: q, Change: c}
 }
 
-func (d *DBdat) dbInsert() error {
+func (dat *DBdata) dbInsert() error {
 	var err error
-	if d.Document == nil {
+	if dat.Document == nil {
 		return ErrNilInterface
 	}
 
-	mdb := d.Handler
+	mdb := dat.Handler
 
 	//mdb.SetMode(mgo.Monotonic, true)
 
-	c := mdb.DB(d.Database).C(d.Collection)
-	err = c.Insert(d.Document)
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	err = c.Insert(dat.Document)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d *DBdat) dbEdit(i interface{}) error {
+func (dat *DBdata) dbEdit(i interface{}) error {
 	var err error
-	if d.Query == nil {
+	if dat.Query == nil {
 		return ErrNilQuery
-	} else if d.Change == nil {
+	} else if dat.Change == nil {
 		return ErrNilChange
 	}
 
 	change := mgo.Change{
-		Update:    d.Change,
+		Update:    dat.Change,
 		ReturnNew: true,
 	}
 
-	mdb := d.Handler
+	mdb := dat.Handler
 	//mdb.SetMode(mgo.Monotonic, true)
 
-	c := mdb.DB(d.Database).C(d.Collection)
-	_, err = c.Find(d.Query).Apply(change, &d.Document)
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	_, err = c.Find(dat.Query).Apply(change, &dat.Document)
 	if err != nil {
 		return err
 	}
@@ -100,14 +100,14 @@ func (d *DBdat) dbEdit(i interface{}) error {
 	return nil
 }
 
-func (d *DBdat) dbDeleteID(id bson.ObjectId) error {
+func (dat *DBdata) dbDeleteID(id bson.ObjectId) error {
 	var err error
 
-	mdb := d.Handler
+	mdb := dat.Handler
 
 	//mdb.SetMode(mgo.Monotonic, true)
 
-	c := mdb.DB(d.Database).C(d.Collection)
+	c := mdb.DB(dat.Database).C(dat.Collection)
 	err = c.RemoveId(id)
 	if err != nil {
 		return err
@@ -116,19 +116,19 @@ func (d *DBdat) dbDeleteID(id bson.ObjectId) error {
 	return nil
 }
 
-func (d *DBdat) dbDelete() error {
+func (dat *DBdata) dbDelete() error {
 	var err error
 
-	if d.Query == nil {
+	if dat.Query == nil {
 		return ErrNilQuery
 	}
 
-	mdb := d.Handler
+	mdb := dat.Handler
 
 	//mdb.SetMode(mgo.Monotonic, true)
 
-	c := mdb.DB(d.Database).C(d.Collection)
-	err = c.Remove(d.Query)
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	err = c.Remove(dat.Query)
 	if err != nil {
 		return err
 	}
@@ -136,17 +136,17 @@ func (d *DBdat) dbDelete() error {
 	return nil
 }
 
-func (d *DBdat) dbGet(i interface{}) error {
+func (dat *DBdata) dbGet(i interface{}) error {
 	var unk interface{}
 	var err error
-	if d.Query == nil {
+	if dat.Query == nil {
 		return ErrNilInterface
 	}
 
-	mdb := d.Handler
+	mdb := dat.Handler
 
-	c := mdb.DB(d.Database).C(d.Collection)
-	err = c.Find(d.Query).One(&unk)
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	err = c.Find(dat.Query).One(&unk)
 	if err != nil {
 		return err
 	}
@@ -154,9 +154,56 @@ func (d *DBdat) dbGet(i interface{}) error {
 	if unk == nil {
 		return mgo.ErrNotFound
 	}
-	d.Document, err = handlerForInterface(i, unk)
+
+	dat.Document, err = handlerForInterface(i, unk)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (dat *DBdata) dbGetWithLimit(i interface{}, sort []string, amount int) error {
+	var unk []interface{}
+	var err error
+
+	mdb := dat.Handler
+
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	err = c.Find(dat.Query).Sort(sort...).Limit(amount).All(&unk)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range unk {
+		h, err := handlerForInterface(i, p)
+		if err != nil {
+			return err
+		}
+		dat.Documents = append(dat.Documents, h)
+	}
+
+	return nil
+}
+
+func (dat *DBdata) dbGetAll(i interface{}) error {
+	var unk []interface{}
+	var err error
+
+	mdb := dat.Handler
+
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	err = c.Find(nil).All(&unk)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range unk {
+		h, err := handlerForInterface(i, p)
+		if err != nil {
+			return err
+		}
+		dat.Documents = append(dat.Documents, h)
 	}
 
 	return nil
@@ -192,35 +239,12 @@ func (d *DBdat) dbGetLimit(i interface{}, count int) error {
 }
 */
 
-func (d *DBdat) dbGetAll(i interface{}) error {
-	var unk []interface{}
-	var err error
-
-	mdb := d.Handler
-
-	c := mdb.DB(d.Database).C(d.Collection)
-	err = c.Find(nil).All(&unk)
-	if err != nil {
-		return err
-	}
-
-	for _, p := range unk {
-		h, err := handlerForInterface(i, p)
-		if err != nil {
-			return err
-		}
-		d.Documents = append(d.Documents, h)
-	}
-
-	return nil
-}
-
-func (d *DBdat) dbCount() (int, error) {
+func (dat *DBdata) dbCount() (int, error) {
 	var err error
 	var n int
-	mdb := d.Handler
+	mdb := dat.Handler
 
-	c := mdb.DB(d.Database).C(d.Collection)
+	c := mdb.DB(dat.Database).C(dat.Collection)
 	if n, err = c.Count(); err != nil {
 		return -1, err
 	}
@@ -228,14 +252,14 @@ func (d *DBdat) dbCount() (int, error) {
 	return n, nil
 }
 
-func (d *DBdat) dbExists() error {
+func (dat *DBdata) dbExists() error {
 	var err error
 	var count int
 
-	mdb := d.Handler
-	c := mdb.DB(d.Database).C(d.Collection)
+	mdb := dat.Handler
+	c := mdb.DB(dat.Database).C(dat.Collection)
 
-	count, err = c.Find(d.Query).Count()
+	count, err = c.Find(dat.Query).Count()
 	if err != nil {
 		return err
 	}
@@ -249,9 +273,9 @@ func (d *DBdat) dbExists() error {
 }
 
 // CoreDatabase will control adding and removing user defined commands.
-func (io *IOdat) CoreDatabase() (err error) {
+func (dat *IOdata) CoreDatabase() (err error) {
 
-	switch io.io[0] {
+	switch dat.io[0] {
 	case "add":
 	case "edit":
 	case "del":

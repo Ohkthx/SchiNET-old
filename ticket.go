@@ -40,7 +40,7 @@ func ticketNew(server, title, comment string, status bool, tID int, addedBy *Use
 }
 
 // CoreTickets handles the ticketing system.
-func (io *IOdat) CoreTickets() error {
+func (dat *IOdata) CoreTickets() error {
 
 	var help, list, add, remove, close, update, get bool
 	var title, comment, note string
@@ -64,7 +64,7 @@ func (io *IOdat) CoreTickets() error {
 	fl.FlagLong(&get, "get", 0, "Get a Ticket based on ID")
 	fl.FlagLong(&tID, "id", 0, "Ticket ID to modify")
 
-	if err := fl.Getopt(io.io, nil); err != nil {
+	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
 	}
 	if fl.NArgs() > 0 {
@@ -73,7 +73,7 @@ func (io *IOdat) CoreTickets() error {
 		}
 	}
 
-	t := ticketNew(io.guild.Name, title, comment, close, tID, io.user)
+	t := ticketNew(dat.guild.Name, title, comment, close, tID, dat.user)
 
 	switch {
 	case get:
@@ -83,7 +83,7 @@ func (io *IOdat) CoreTickets() error {
 		if err := t.Get(tID); err != nil {
 			return err
 		}
-		io.msgEmbed = embedCreator(t.String(), ColorYellow)
+		dat.msgEmbed = embedCreator(t.String(), ColorYellow)
 	case add:
 		if t.Title == "" || t.Comment == "" {
 			return errors.New("need a title and/or a comment")
@@ -93,7 +93,7 @@ func (io *IOdat) CoreTickets() error {
 			return err
 		}
 
-		io.msgEmbed = embedCreator("Ticket created.", ColorGreen)
+		dat.msgEmbed = embedCreator("Ticket created.", ColorGreen)
 
 	case update:
 		if tID < 0 {
@@ -103,7 +103,7 @@ func (io *IOdat) CoreTickets() error {
 			return err
 		}
 
-		if t.AddedBy.ID != io.user.ID || io.user.HasPermissionGTE(t.Server, permAdmin) {
+		if t.AddedBy.ID != dat.user.ID || dat.user.HasPermissionGTE(t.Server, permAdmin) {
 			return ErrBadPermissions
 		}
 
@@ -121,7 +121,7 @@ func (io *IOdat) CoreTickets() error {
 			return err
 		}
 
-		io.msgEmbed = embedCreator("Ticket updated.", ColorGreen)
+		dat.msgEmbed = embedCreator("Ticket updated.", ColorGreen)
 
 	case remove || close:
 		if tID < 0 {
@@ -130,7 +130,7 @@ func (io *IOdat) CoreTickets() error {
 		if err := t.Get(tID); err != nil {
 			return err
 		}
-		if t.AddedBy.ID != io.user.ID || io.user.HasPermissionGTE(t.Server, permAdmin) {
+		if t.AddedBy.ID != dat.user.ID || dat.user.HasPermissionGTE(t.Server, permAdmin) {
 			return ErrBadPermissions
 		}
 		if note == "" {
@@ -139,7 +139,7 @@ func (io *IOdat) CoreTickets() error {
 		var text = "Ticket successfully closed."
 		t.Notes = append(t.Notes, note)
 		t.Open = false
-		t.ClosedBy = io.user.Basic()
+		t.ClosedBy = dat.user.Basic()
 		t.DateClosed = time.Now()
 		if remove {
 			t.Removed = true
@@ -148,17 +148,17 @@ func (io *IOdat) CoreTickets() error {
 		if err := t.Update(); err != nil {
 			return err
 		}
-		io.msgEmbed = embedCreator(text, ColorGreen)
+		dat.msgEmbed = embedCreator(text, ColorGreen)
 	case list:
 		var err error
-		io.output, err = ticketList(t.Server)
+		dat.output, err = ticketList(t.Server)
 		if err != nil {
 			return err
 		}
 	case help:
 		fallthrough
 	default:
-		io.output = Help(fl, "", "")
+		dat.output = Help(fl, "", "")
 	}
 
 	return nil
@@ -170,7 +170,7 @@ func (t *Ticket) Get(tID int) error {
 
 	q["ticketid"] = tID
 
-	var dbdat = DBdatCreate(t.Server, CollectionTickets, Ticket{}, q, nil)
+	dbdat := DBdataCreate(t.Server, CollectionTickets, Ticket{}, q, nil)
 	err := dbdat.dbGet(Ticket{})
 	if err != nil {
 		return err
@@ -191,7 +191,7 @@ func (t *Ticket) Update() error {
 	if t.TicketID < 0 {
 		var n int
 		var err error
-		var dbdat = DBdatCreate(t.Server, CollectionTickets, t, nil, nil)
+		dbdat := DBdataCreate(t.Server, CollectionTickets, t, nil, nil)
 		if n, err = dbdat.dbCount(); err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func (t *Ticket) Update() error {
 		"dateclosed": t.DateClosed,
 	}
 
-	var dbdat = DBdatCreate(t.Server, CollectionTickets, t, q, c)
+	dbdat := DBdataCreate(t.Server, CollectionTickets, t, q, c)
 	err = dbdat.dbEdit(Ticket{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -282,7 +282,7 @@ func (t Ticket) String() string {
 
 // List all of the tickets in the database.
 func ticketList(server string) (string, error) {
-	db := DBdatCreate(server, CollectionTickets, Ticket{}, nil, nil)
+	db := DBdataCreate(server, CollectionTickets, Ticket{}, nil, nil)
 	if err := db.dbGetAll(Ticket{}); err != nil {
 		return "", err
 	}

@@ -23,14 +23,13 @@ type console struct {
 func (cfg *Config) core() {
 	var err error
 	reader := bufio.NewReader(os.Stdin)
-
-	//channelsTemp()
+	cmdPrefix := envCMDPrefix
 
 	for {
 		fmt.Printf("[%s] > ", time.Now().Format(time.Stamp))
 		input, _ := reader.ReadString('\n')
-		_, s := strToCommands(input)
-		iodat := sliceToIOdat(cfg.Core, s)
+		_, s := strToCommands(input, cmdPrefix)
+		iodat := sliceToIOdata(cfg.Core, s, cmdPrefix)
 
 		if len(iodat.io) > 0 {
 			if iodat.io[0] == "exit" {
@@ -42,12 +41,6 @@ func (cfg *Config) core() {
 					continue
 				}
 			}
-			/*
-				err = cfg.ioHandler(iodat)
-				if err != nil {
-					fmt.Println(err)
-				}
-			*/
 		}
 	}
 
@@ -100,7 +93,7 @@ func (con *console) Parser() error {
 
 // channelCheck archives a particular guild's messages into a local database.
 func (con *console) channelCheck(guild string) error {
-	msg, err := con.config.MessageIntegrityCheck(guild)
+	msg, err := con.config.messageIntegrityCheck(guild)
 	if err != nil {
 		return err
 	}
@@ -127,8 +120,9 @@ func (con *console) Watch() error {
 	var guilds = con.config.Core.Guilds
 	// List available guilds.
 	fmt.Println("Select a guild by number: ")
+	fmt.Printf(" [%2d] %s\n", 0, "Private Messages")
 	for n, g := range guilds {
-		fmt.Printf(" [%2d] %s\n", n, g.Name)
+		fmt.Printf(" [%2d] %s\n", n+1, g.Name)
 	}
 
 	var num = -1
@@ -138,75 +132,106 @@ func (con *console) Watch() error {
 
 	// Run until either ",quit" or a valid option is selected.
 	for num < 0 {
-		fmt.Print("Guild number [,exit to exit]: ")
+		fmt.Print("Guild number [type 'exit' to exit]: ")
 		input, _ = reader.ReadString('\n')
 		input = stripWhiteSpace(input)
 		num, err = strconv.Atoi(input)
-		if strings.ToLower(input) == ",quit" {
+		if strings.ToLower(input) == "exit" {
 			break
 		} else if err != nil {
 			num = -1
 			continue
-		} else if num >= 0 && num < len(guilds) {
+		} else if num >= 0 && num <= len(guilds) {
 			break
 		}
 	}
 
-	if strings.ToLower(input) == ",quit" {
+	if strings.ToLower(input) == "exit" {
 		return nil
 	}
 
 	var watched WatchLog
-	watched.guildID = guilds[num].ID
-	watched.guildName = guilds[num].Name
+	if num == 0 {
+		watched.guildID = "private"
+		watched.guildName = "private"
+	} else {
 
-	var i int
+		watched.guildID = guilds[num-1].ID
+		watched.guildName = guilds[num-1].Name
+		// Reset num (for channel check.)
+		num = -1
+	}
+
 	var channels []*discordgo.Channel
-	var channelsTotal = con.config.Core.Links[watched.guildID]
+	// This will be skipped if opted for private messages due to num not being reset.
+	if num < 0 {
+		var i = 1
 
-	fmt.Println("Select a channel by number: ")
-	for _, c := range channelsTotal {
-		if c.Type == 0 {
-			fmt.Printf(" [%2d] %s\n", i, c.Name)
-			i++
-			channels = append(channels, c)
+		var channelsTotal = con.config.Core.Links[watched.guildID]
+		fmt.Println("Select a channel by number: ")
+		for _, c := range channelsTotal {
+			if c.Type == 0 {
+				fmt.Printf(" [%2d] %s\n", i, c.Name)
+				i++
+				channels = append(channels, c)
+			}
 		}
 	}
 
-	num = -1
-
 	// Run until either ",quit", ",all", or a valid integer is provided.
 	for num < 0 {
-		fmt.Print("Channel number [,all or all / ,exit to exit]: ")
+		fmt.Print("Channel number ['0' for all / 'exit' to exit]: ")
 		input, _ = reader.ReadString('\n')
 		input = stripWhiteSpace(input)
 		num, err = strconv.Atoi(input)
-		if strings.ToLower(input) == ",all" || strings.ToLower(input) == ",exit" {
+		if strings.ToLower(input) == "exit" {
 			break
 		} else if err != nil {
 			num = -1
 			continue
-		} else if num >= 0 && num < len(channels) {
+		} else if num >= 0 && num <= len(channels) {
 			break
 		}
 	}
 
-	if strings.ToLower(input) == ",exit" {
+	if strings.ToLower(input) == "exit" {
 		return nil
-	} else if strings.ToLower(input) != ",all" && num >= 0 && num < len(channels) {
-		watched.channelID = channels[num].ID
-		watched.channelName = channels[num].Name
+	} else if num > 0 && num <= len(channels) {
+		watched.channelID = channels[num-1].ID
+		watched.channelName = channels[num-1].Name
 	} else {
-		// ",all" or a bad number somehow provided.
-		watched.channelID = ""
-		watched.channelName = ""
+		// Number should be 0 to indicate "all"
+		watched.channelAll = true
+	}
+
+	num = -1
+	for num < 0 {
+		fmt.Print("Amount of messages to pull from database: ")
+		input, _ = reader.ReadString('\n')
+		input = stripWhiteSpace(input)
+		if num, err = strconv.Atoi(input); err != nil {
+			continue
+		}
 	}
 
 	// Start the channel (for communicating to go routine),
 	// add to our list of watchers and start the actual server.
 	watched.channel = make(chan string)
 	con.config.watched = append(con.config.watched, watched)
-	go con.watchServer(watched)
+
+	var serverStarted chan string
+	serverStarted = make(chan string)
+
+	go con.watchServer(watched, serverStarted, num)
+
+	msg := <-serverStarted
+	close(serverStarted)
+	fmt.Print("Server status: " + msg + "\n")
+
+	// Send archived messages desired.
+	if err := con.watchGetLast(watched, num); err != nil {
+		fmt.Println("Processing archived messages: " + err.Error())
+	}
 
 	return nil
 }
@@ -215,7 +240,7 @@ func (con *console) Watch() error {
 func (con *console) WatchKill() error {
 	fmt.Println("Select a watcher to kill")
 	for n, w := range con.config.watched {
-		fmt.Printf(" [%2d] %s ", n, w.guildName)
+		fmt.Printf(" [%2d] %s ", n+1, w.guildName)
 		if w.channelName != "" {
 			fmt.Printf("-> %s", w.channelName)
 		}
@@ -223,23 +248,23 @@ func (con *console) WatchKill() error {
 	}
 
 	var input string
-	var num = -1
+	var num = 0
 	reader := bufio.NewReader(os.Stdin)
 
-	// Run until a valid number is provided to kill OR ",exit" to cancel.
-	for num < 0 {
-		fmt.Print("Number to kill: ")
+	// Run until a valid number is provided to kill OR "exit" to cancel.
+	for num < 1 {
+		fmt.Print("Number to kill ['exit' to exit]: ")
 		input, _ = reader.ReadString('\n')
 		num, _ = strconv.Atoi(stripWhiteSpace(input))
 
 		// Break and return to main console loop.
-		if strings.ToLower(stripWhiteSpace(input)) == ",exit" {
+		if strings.ToLower(stripWhiteSpace(input)) == "exit" {
 			break
 		}
 
 		// Send the "[PID]die" string to tell the distant logger to exit and close.
-		if num >= 0 && num < len(con.config.watched) {
-			w := con.config.watched[num]
+		if num > 0 && num <= len(con.config.watched) {
+			w := con.config.watched[num-1]
 			w.Talk(w.pid + "die")
 
 			break
@@ -249,7 +274,7 @@ func (con *console) WatchKill() error {
 }
 
 // watchServer launches a need server that a client can connect to- to get information.
-func (con *console) watchServer(watch WatchLog) {
+func (con *console) watchServer(watch WatchLog, serverStarted chan string, amount int) {
 	fmt.Println("Starting new WatchLog...")
 
 	var portBase = 8444
@@ -272,6 +297,7 @@ func (con *console) watchServer(watch WatchLog) {
 	portS := strconv.Itoa(portN)
 
 	// Launch a new window (WINDOWS SPECIFIC- NEED CHANGING.)
+	// TAG: TODO - *nix compatible.
 	cmd := exec.Command("cmd", "/C", "start", "usmbot.exe", "-watcher", "-host", hostS, "-port", portS)
 	if err := cmd.Start(); err != nil {
 		fmt.Println(err)
@@ -279,14 +305,14 @@ func (con *console) watchServer(watch WatchLog) {
 	}
 
 	fmt.Println("Granting " + hostS + ":" + portS + " to connect too.")
-	ln, _ := net.Listen("tcp", ":"+portS)
+	ln, err := net.Listen("tcp", ":"+portS)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer ln.Close()
 
 	conn, _ := ln.Accept()
-
-	var init = "Initiated: " + watch.guildName
-	if watch.channelName != "" {
-		init += " on " + watch.channelName
-	}
 
 	// Retrieve the client's (CHILD) PID.
 	pID, _ := bufio.NewReader(conn).ReadString('\n')
@@ -308,25 +334,96 @@ func (con *console) watchServer(watch WatchLog) {
 		}
 	}
 
+	// Initiated text sent to client.
+	var init = "Initiated: " + watch.guildName
+	if watch.channelName != "" {
+		init += " on " + watch.channelName
+	}
+
 	// Send our "Initiated" string to child.
-	conn.Write([]byte("--> " + init + "\n"))
+	conn.Write([]byte("--> " + init + "\n\n"))
+
+	serverStarted <- "ok"
 
 	// Loop until "[PID]die" is supplied to terminate connection.
 	for msg := range watch.channel {
-		conn.Write([]byte(msg + "\n"))
+		_, err = conn.Write([]byte(msg + "\n"))
+		if err != nil {
+			fmt.Println(err)
+		}
 		if msg == pID+"die" {
 			break
 		}
+		// Small pause, no pause resulted in lost messages.
+		time.Sleep(time.Millisecond)
 	}
 
 	// Remove it from the active watchers slices.
-	con.config.watched[watchedN] = con.config.watched[len(con.config.watched)-1]
-	con.config.watched = con.config.watched[:len(con.config.watched)-1]
+	if len(con.config.watched) == 1 {
+		con.config.watched = nil
+	} else {
+		con.config.watched[watchedN] = con.config.watched[len(con.config.watched)-1]
+		con.config.watched = con.config.watched[:len(con.config.watched)-1]
+	}
 
 	// Close the socket.
 	close(watch.channel)
 	conn.Close()
 	fmt.Println("PID [" + pID + "] killed.")
+}
+
+// watchGetLast retrieves X amount of messages from database to forward to watch client.
+func (con *console) watchGetLast(watch WatchLog, amount int) error {
+	// Prevent attempting bad number of messages.
+	if amount <= 0 {
+		return nil
+	}
+
+	var q = make(map[string]interface{})
+	if watch.channelID != "" {
+		q["channelid"] = watch.channelID
+	} else {
+		q = nil
+	}
+
+	var err error
+	dbdat := DBdataCreate(watch.guildName, CollectionMessages, Message{}, q, nil)
+	if err = dbdat.dbGetWithLimit(Message{}, []string{"-timestamp"}, amount); err != nil {
+		return err
+	}
+
+	var msgs []Message
+	var msg Message
+	for _, m := range dbdat.Documents {
+		msg = m.(Message)
+		msgs = append(msgs, msg)
+	}
+
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+
+	for _, m := range msgs {
+		output := watch.MessageCreate(m.Author.Name, m.Author.Discriminator, m.ChannelName, m.Content)
+		watch.Talk(output)
+	}
+
+	return nil
+}
+
+// MessageCreate converts a message to proper output for Talk.
+func (watch WatchLog) MessageCreate(username, discriminator, channel, content string) string {
+	// Compose the message to send to the channel then the socket.
+	var output = "--> "
+	if watch.channelAll && channel != "" {
+		output += "[" + channel + "]"
+		// Check that we are monitoring this channel if any...
+	}
+
+	// Eventually add support for ContentWithMoreMentionsReplaced()
+	output += "[" + username + "#" + discriminator + "] " + content
+
+	return output
 }
 
 // Talk sends a message over a channel.

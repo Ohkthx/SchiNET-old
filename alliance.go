@@ -37,7 +37,7 @@ var (
 )
 
 // CoreAlliance handles all alliance COMMAND actions
-func (cfg *Config) CoreAlliance(io *IOdat) error {
+func (cfg *Config) CoreAlliance(dat *IOdata) error {
 	var name, key string
 	var help, list, init, delete bool
 
@@ -50,7 +50,7 @@ func (cfg *Config) CoreAlliance(io *IOdat) error {
 	fl.FlagLong(&help, "help", 'h', "This menus")
 	fl.FlagLong(&list, "list", 'l', "List Guilds available.")
 
-	if err := fl.Getopt(io.io, nil); err != nil {
+	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
 	}
 	if fl.NArgs() > 0 {
@@ -66,27 +66,27 @@ func (cfg *Config) CoreAlliance(io *IOdat) error {
 
 	// Handle the various commands: LIST, HELP, INIT, AND DELETE
 	if list {
-		io.msgEmbed = embedCreator(cfg.Core.GuildsString(), ColorBlue)
+		dat.msgEmbed = embedCreator(cfg.Core.GuildsString(), ColorBlue)
 		return nil
 	} else if help {
-		io.output = Help(fl, "", "")
+		dat.output = Help(fl, "", "")
 		return nil
 	} else if init {
-		if err := cfg.AllianceInit(name, io.guild); err != nil {
+		if err := cfg.AllianceInit(name, dat.guild); err != nil {
 			return err
 		}
-		passkey := fmt.Sprintf("Pass this key to other guild:\n**%s**", io.guild.ID)
-		io.msgEmbed = embedCreator(passkey, ColorGreen)
+		passkey := fmt.Sprintf("Pass this key to other guild:\n**%s**", dat.guild.ID)
+		dat.msgEmbed = embedCreator(passkey, ColorGreen)
 		return nil
 	} else if delete {
-		if ok := io.user.HasPermissionGTE(io.guild.Name, permModerator); !ok {
+		if ok := dat.user.HasPermissionGTE(dat.guild.Name, permModerator); !ok {
 			return ErrBadPermissions
 		}
 		if err := cfg.AllianceBreak(name); err != nil {
 			return err
 		}
 	} else if key != "" {
-		if err := cfg.AllianceJoin(name, key, io.guild); err != nil {
+		if err := cfg.AllianceJoin(name, key, dat.guild); err != nil {
 			return err
 		}
 		return nil
@@ -208,7 +208,7 @@ func (cfg *Config) AlliancePending(name, key string) bool {
 }
 
 // AllianceHandler will check if channel is an alliance and process messages.
-func (cfg *Config) AllianceHandler(m *discordgo.Message) error {
+func (cfg *Config) allianceHandler(m *discordgo.Message) error {
 	var ally Alliance
 	var found bool
 	cID := m.ChannelID
@@ -232,6 +232,9 @@ func (cfg *Config) AllianceHandler(m *discordgo.Message) error {
 	} else {
 		rcvID = ally.PartyA.ChannelID
 	}
+
+	// Convert from an @mention to plain text
+	// TAG: TODO
 
 	// Scan for @mentions
 	var content string
@@ -274,16 +277,20 @@ func (cfg *Config) AllianceBreak(name string) error {
 		}
 	}
 
+	// Remove the alliance from the current maintained alliances.
 	cfg.Alliances = append(cfg.Alliances[:cnt], cfg.Alliances[cnt+1:]...)
 	if err := ally.Delete(); err != nil {
 		return err
 	}
 
+	// Send out the notification to both server.
 	var msg = fmt.Sprintf("The [**%s**] alliance has fallen!", ally.Name)
 	embed := embedCreator(msg, ColorMaroon)
 	cfg.Core.Session.ChannelMessageSendEmbed(ally.Party1.GuildID, embed)
 	cfg.Core.Session.ChannelMessageSendEmbed(ally.PartyA.GuildID, embed)
 
+	// Cleanup the channels and remove the alliance channel from each server.
+	// TAG: TODO - Error handling incase deletion fails.
 	cfg.Core.Session.ChannelDelete(ally.PartyA.ChannelID)
 	cfg.Core.Session.ChannelDelete(ally.Party1.ChannelID)
 
@@ -304,7 +311,10 @@ func (ally *Alliance) Update() error {
 		"party1": ally.Party1,
 	}
 
-	var dbdat = DBdatCreate("config", CollectionAlliances, ally, q, c)
+	// Construct the the query for the database.
+	var dbdat = DBdataCreate("config", CollectionAlliances, ally, q, c)
+
+	// Edit the databases version of the alliance.
 	err = dbdat.dbEdit(Alliance{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -325,7 +335,7 @@ func (ally *Alliance) Delete() error {
 	var q = make(map[string]interface{})
 
 	q["name"] = ally.Name
-	var dbdat = DBdatCreate("config", CollectionAlliances, ally, q, nil)
+	var dbdat = DBdataCreate("config", CollectionAlliances, ally, q, nil)
 	if err := dbdat.dbGet(Alliance{}); err != nil {
 		if err == mgo.ErrNotFound {
 			return nil
@@ -343,7 +353,7 @@ func (ally *Alliance) Delete() error {
 
 // AlliancesLoad grabs all current alliances from database.
 func (cfg *Config) AlliancesLoad() error {
-	dbdat := DBdatCreate("config", CollectionAlliances, Alliance{}, nil, nil)
+	dbdat := DBdataCreate("config", CollectionAlliances, Alliance{}, nil, nil)
 	err := dbdat.dbGetAll(Alliance{})
 	if err != nil {
 		if err == mgo.ErrNotFound {

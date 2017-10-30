@@ -1,3 +1,22 @@
+0.7.2 - Additions:
+            - WatchLog: Request prior messages from database to be displayed.
+            - WatchLog: Can now display private messages.
+            - Core: Loading guild configurations for customizable feature per guild.
+            - Core: Player leaving server notification enabled.
+            - Message Handling: Private messages being logged to Database.
+            - Message Handling: Editing messages now reflects/updates to Database.
+            - Message Clearing: Fast and Slow methods added. 
+                Fast uses the bulk method. Restrictions are for messages younger than 14 days.
+                Slow deletes message by message. Slower but has no restrictions.
+        Fixes:
+            - Alias modified to support guild speicifc command prefixes.
+            - Renamed tons of functions and variables to be more fitting for their use.
+            - WatchLog: Guild/Channel select modified to being int based versus string.
+            - Events: Hours older than 0min, and less than 23 hours properly displaying time occured.
+            - Core: Rearranged order of functions for efficiency.
+            - Message Handling: Additional checks for accessing nil memory.
+                Added an API call in case Channel and Guild is unknown.
+
 0.7.1 - Additions:
             - Console updates!
                 - Better console parsing.

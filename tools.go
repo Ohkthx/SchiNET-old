@@ -27,7 +27,7 @@ const (
 	ColorYellow = 0xFEEB65
 )
 
-func strToCommands(io string) (bool, []string) {
+func strToCommands(io, cmdPrefix string) (bool, []string) {
 	var cmd bool
 	var slice []string
 
@@ -48,8 +48,8 @@ func strToCommands(io string) (bool, []string) {
 	}
 
 	var str = io
-	if strings.HasPrefix(io, envCMDPrefix) {
-		str = strings.TrimPrefix(io, envCMDPrefix)
+	if strings.HasPrefix(io, cmdPrefix) {
+		str = strings.TrimPrefix(io, cmdPrefix)
 		cmd = true
 	}
 
@@ -77,25 +77,25 @@ func stripWhiteSpace(text string) string {
 	}, text)
 }
 
-func msgToIOdat(msg *discordgo.MessageCreate) *IOdat {
-	var io IOdat
+func msgToIOdata(msg *discordgo.MessageCreate, cmdPrefix string) *IOdata {
+	var dat IOdata
 	u := msg.Author
 
-	io.command, io.io = strToCommands(msg.Content)
-	io.input = msg.Content
-	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
-	io.msg = msg
+	dat.command, dat.io = strToCommands(msg.Content, cmdPrefix)
+	dat.input = msg.Content
+	dat.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
+	dat.msg = msg
 
-	return &io
+	return &dat
 }
 
-func sliceToIOdat(b *godbot.Core, s []string) *IOdat {
+func sliceToIOdata(b *godbot.Core, s []string, cmdPrefix string) *IOdata {
 	u := b.User
-	var io IOdat
-	io.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
-	io.command, io.io = strToCommands(strings.Join(s, " "))
+	var dat IOdata
+	dat.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
+	dat.command, dat.io = strToCommands(strings.Join(s, " "), cmdPrefix)
 
-	return &io
+	return &dat
 }
 
 func tsConvert(ts string) string {
@@ -119,24 +119,25 @@ func usernameSplit(username string) []string {
 	return strings.Split(username, "#")
 }
 
-func (cfg *Config) ioHandler(io *IOdat) (err error) {
-	if len(io.io) < 1 {
+func (cfg *Config) ioHandler(dat *IOdata) error {
+	var err error
+	if len(dat.io) < 1 {
 		// Not enough arguments to do anything.
 		// Prevents accessing nil pointer.
 		return nil
 	}
 
 	// Make sure the channel is allowed to have bot commmands.
-	if io.io[0] != "channel" {
-		ch := ChannelNew(io.msg.ChannelID, io.guild.Name)
-		if !io.user.HasPermission(io.guild.ID, permModerator) && !ch.Check() {
-			io.msgEmbed = embedCreator("Bot commands have been disabled here.", ColorGray)
+	if dat.io[0] != "channel" {
+		ch := ChannelNew(dat.msg.ChannelID, dat.guild.Name)
+		if !dat.user.HasPermission(dat.guild.ID, permModerator) && !ch.Check() {
+			dat.msgEmbed = embedCreator("Bot commands have been disabled here.", ColorGray)
 			return nil
 		}
 	}
 
 	// Check if an alias here
-	alias := AliasNew(io.io[0], "", io.user)
+	alias := AliasNew(dat.io[0], "", dat.user)
 	link, err := alias.Check()
 	if err != nil {
 		if err != mgo.ErrNotFound {
@@ -144,48 +145,50 @@ func (cfg *Config) ioHandler(io *IOdat) (err error) {
 		}
 		err = nil
 	} else {
-		io.io = aliasConv(io.io[0], link, io.input)
+		dat.io = aliasConv(dat, link)
 	}
 
-	command := io.io[0]
+	command := dat.io[0]
 	switch strings.ToLower(command) {
 	case "help":
-		io.output = globalHelp()
+		dat.output = globalHelp()
 	case "roll":
-		io.miscRoll()
+		dat.miscRoll()
 	case "top10":
-		io.miscTop10()
+		dat.miscTop10()
 	case "gen":
-		io.roomGen()
+		dat.roomGen()
 	case "sz":
-		io.msgEmbed = embedCreator(msgSize(io.msg.Message), ColorYellow)
+		dat.msgEmbed = embedCreator(msgSize(dat.msg.Message), ColorYellow)
 	case "invite":
-		io.msgEmbed = embedCreator(botInvite(), ColorGreen)
+		dat.msgEmbed = embedCreator(botInvite(), ColorGreen)
 	case "ally":
-		err = cfg.CoreAlliance(io)
+		return cfg.CoreAlliance(dat)
 	case "user":
-		err = io.CoreUser()
+		return dat.CoreUser()
 	case "alias":
-		err = io.CoreAlias()
+		return dat.CoreAlias()
 	case "histo":
-		err = io.histograph(cfg.Core.Session)
+		return dat.histograph(cfg.Core.Session)
 	case "channel":
-		err = io.ChannelCore()
+		return dat.ChannelCore()
 	case "event", "events":
-		err = io.CoreEvent()
+		return dat.CoreEvent()
 	case "ticket", "tickets":
-		err = io.CoreTickets()
+		return dat.CoreTickets()
 	case "cmd", "command":
-		err = io.CoreDatabase()
+		return dat.CoreDatabase()
 	case "script", "scripts":
-		err = io.CoreLibrary()
+		return dat.CoreLibrary()
 	case "clear", "delete":
-		err = io.messageClear(cfg.DSession)
+		return dat.messageClear(cfg.DSession, "fast")
+	case "clear-slow":
+		return dat.messageClear(cfg.DSession, "slow")
 	case "echo":
-		io.output = strings.Join(io.io[1:], " ")
-		return
+		dat.output = strings.Join(dat.io[1:], " ")
+		return nil
 	}
-	return
+	return nil
 }
 
 func embedCreator(description string, color int) *discordgo.MessageEmbed {
@@ -198,24 +201,23 @@ func embedCreator(description string, color int) *discordgo.MessageEmbed {
 }
 
 // messageClear removes X number of messages from the current server.
-// TAG: TODO - support for the 100 message deleter (quicker)
-func (io *IOdat) messageClear(s *discordgo.Session) error {
-	channelID := io.msg.ChannelID
-	messageID := io.msg.ID
+func (dat *IOdata) messageClear(s *discordgo.Session, method string) error {
+	channelID := dat.msg.ChannelID
+	messageID := dat.msg.ID
 
 	// Need permModerator to remove.
-	if ok := io.user.HasPermission(io.guild.ID, permModerator); !ok {
+	if ok := dat.user.HasPermission(dat.guild.ID, permModerator); !ok {
 		return ErrBadPermissions
 	}
 
 	// Validate a good number is provided.
-	if len(io.io) < 2 {
+	if len(dat.io) < 2 {
 		return errors.New("Invalid number provided")
 	}
 
 	var err error
 	var amount int
-	if amount, err = strconv.Atoi(io.io[1]); err != nil {
+	if amount, err = strconv.Atoi(dat.io[1]); err != nil {
 		return err
 	}
 
@@ -225,7 +227,18 @@ func (io *IOdat) messageClear(s *discordgo.Session) error {
 		return err
 	}
 
-	var msgs []*discordgo.Message
+	if strings.ToLower(method) == "slow" {
+		return dat.messageClearSlow(s, channelID, messageID, amount)
+	}
+
+	return dat.messageClearFast(s, channelID, messageID, amount)
+}
+
+// messageClearFast uses the bulk deletion for faster clearing. Has a limitation of 100
+// messages at a time and they can't be older than 2 weeks.
+func (dat *IOdata) messageClearFast(s *discordgo.Session, channelID, messageID string, amount int) error {
+	var err error
+	var processed int
 	// While we have messages to delete, pull and remove.
 	for amount > 0 {
 		var toGet int
@@ -234,6 +247,48 @@ func (io *IOdat) messageClear(s *discordgo.Session) error {
 		} else {
 			toGet = amount
 		}
+
+		var msgs []*discordgo.Message
+		if msgs, err = s.ChannelMessages(channelID, toGet, messageID, "", ""); err != nil {
+			fmt.Println(err)
+			return err
+		}
+
+		var mIDs []string
+		for _, m := range msgs {
+			mIDs = append(mIDs, m.ID)
+		}
+
+		if err := s.ChannelMessagesBulkDelete(channelID, mIDs); err != nil {
+			dat.output = fmt.Sprintf("Deleted **%d** messages.\n"+
+				"`%sclear-slow` command can clear additional messages.", processed, dat.cmdPrefix)
+			return err
+		}
+
+		processed += toGet
+		amount -= toGet
+	}
+
+	dat.output = fmt.Sprintf("Deleted **%d** messages.\n", processed)
+	return nil
+}
+
+// messageClearSlow removes X number of messages from the current server.
+// This is the slow method that processes 1 message at a time and circumvents the
+// 2week old and 100 message at a time rules.
+func (dat *IOdata) messageClearSlow(s *discordgo.Session, channelID, messageID string, amount int) error {
+	var err error
+	var processed int
+	// While we have messages to delete, pull and remove.
+	for amount > 0 {
+		var toGet int
+		if amount > 100 {
+			toGet = 100
+		} else {
+			toGet = amount
+		}
+
+		var msgs []*discordgo.Message
 		if msgs, err = s.ChannelMessages(channelID, toGet, messageID, "", ""); err != nil {
 			fmt.Println(err)
 			return err
@@ -242,14 +297,16 @@ func (io *IOdat) messageClear(s *discordgo.Session) error {
 		for _, m := range msgs {
 			if err = s.ChannelMessageDelete(channelID, m.ID); err != nil {
 				fmt.Println(err)
+				dat.output = fmt.Sprintf("Deleted **%d** messages.\n", processed)
 				return err
 			}
 		}
+
+		processed++
 		amount -= toGet
 	}
 
-	//s.ChannelMessageSendEmbed(channelID, embedCreator("Messages removed.", ColorMaroon))
-
+	dat.output = fmt.Sprintf("Deleted **%d** messages.\n", processed)
 	return nil
 }
 
