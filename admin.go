@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bwmarrin/discordgo"
+
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -199,11 +201,14 @@ func (conf *Config) GuildConfigLoad() error {
 		var gc = newGuildConfig(g.ID, g.Name)
 		if err := gc.Get(); err != nil {
 			if err == mgo.ErrNotFound {
-				gc.Name = g.Name
-				gc.Prefix = envCMDPrefix
-				if err = gc.Update(); err != nil {
-					return err
-				}
+				/*
+					gc.Name = g.Name
+					gc.Prefix = envCMDPrefix
+					if err = gc.Update(); err != nil {
+						return err
+					}*/
+				ng := &discordgo.GuildCreate{Guild: g}
+				conf.guildCreateHandler(conf.DSession, ng)
 				return nil
 			}
 			return err

@@ -16,7 +16,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.7.2"
+	_version       = "0.8.1"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -132,6 +132,7 @@ func main() {
 	// TAG: TODO - fix this by finding an alternative.
 	Bot = bot
 	Mgo = cfg.DB
+	cfg.DSession = bot.Session
 
 	// Process the default bot command aliases.
 	if err := cfg.defaultAliases(); err != nil {

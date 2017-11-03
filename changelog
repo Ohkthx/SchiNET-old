@@ -1,3 +1,7 @@
+0.8.1 - Fixes:
+            - Properly processes newly added guilds that were added while the bot was offline.
+            - Prevention of early nil session access.
+
 0.8.0 - Additions:
             - Swapped the permission scheme to be based on discord roles.
             - Banning changed to Abuse for users who are abusing the bot.
