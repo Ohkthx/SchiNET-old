@@ -82,6 +82,7 @@ func msgToIOdata(msg *discordgo.MessageCreate, cmdPrefix string) *IOdata {
 	u := msg.Author
 
 	dat.command, dat.io = strToCommands(msg.Content, cmdPrefix)
+	dat.cmdPrefix = cmdPrefix
 	dat.input = msg.Content
 	dat.user = &User{ID: u.ID, Username: u.Username, Discriminator: u.Discriminator, Bot: u.Bot}
 	dat.msg = msg
@@ -130,7 +131,8 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 	// Make sure the channel is allowed to have bot commmands.
 	if dat.io[0] != "channel" {
 		ch := ChannelNew(dat.msg.ChannelID, dat.guild.Name)
-		if !dat.user.HasPermission(dat.guild.ID, permModerator) && !ch.Check() {
+		// TAG: TODO - Add support for having EITHER Administrator or Moderator.
+		if !dat.user.HasRoleType(dat.guildConfig, rolePermissionMod) && !ch.Check() {
 			dat.msgEmbed = embedCreator("Bot commands have been disabled here.", ColorGray)
 			return nil
 		}
@@ -184,6 +186,8 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 		return dat.messageClear(cfg.DSession, "fast")
 	case "clear-slow":
 		return dat.messageClear(cfg.DSession, "slow")
+	case "admin":
+		return cfg.CoreAdmin(dat)
 	case "echo":
 		dat.output = strings.Join(dat.io[1:], " ")
 		return nil
@@ -206,7 +210,8 @@ func (dat *IOdata) messageClear(s *discordgo.Session, method string) error {
 	messageID := dat.msg.ID
 
 	// Need permModerator to remove.
-	if ok := dat.user.HasPermission(dat.guild.ID, permModerator); !ok {
+	// TAG: TODO - check for greater then.
+	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionMod); !ok {
 		return ErrBadPermissions
 	}
 
@@ -376,4 +381,11 @@ func msgSize(m *discordgo.Message) string {
 	}
 
 	return fmt.Sprintf("\nContent:\n%s\n\nSize of message: %d bytes\n", m.Content[4:], sz)
+}
+
+// printDebug creates a debug message to be displayed.
+func printDebug(msg string) {
+	if DEBUG {
+		fmt.Println("DEBUG: " + msg)
+	}
 }

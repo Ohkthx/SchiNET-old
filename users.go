@@ -10,7 +10,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/pborman/getopt/v2"
 
-	"github.com/d0x1p2/godbot"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -21,16 +20,15 @@ type userFlags struct {
 	server     string      // Server for opperation.
 	serverName string      // Name of the server.
 	// Generics
-	User    string // User to perform action on.
-	Comment string // Comment for action.
-	Type    string // Type of Action.
-	Help    bool   // Command Help
-	List    bool   // List Command objects/items/etc
-	Add     bool
-	Remove  bool
+	User   string // User to perform action on.
+	Type   string // Type of Action.
+	Help   bool   // Command Help
+	List   bool   // List Command objects/items/etc
+	Add    bool
+	Remove bool
 
 	// Ban related
-	Ban bool // Ban enabled.
+	BotAbuse bool // Bot is being abused.
 
 	// Credit related
 	Xfer   bool // Transfer
@@ -49,10 +47,8 @@ var (
 	ErrBanChanExists  = errors.New("user already has a ban for that channel")
 	ErrBanNotFound    = errors.New("ban not found to clear")
 
-	banSyntaxHard   = ",ban  --type hard  --user \"@Username\"\n"
-	banSyntaxSoft   = ",ban  --type soft  --user \"@Username\"  -c \"Bug Exploits\"\n"
-	banSyntaxRemove = ",ban  --type hard  --user \"@Username\"  --remove\n"
-	banSyntaxAll    = banSyntaxHard + banSyntaxSoft + banSyntaxRemove
+	abuseSyntax    = ",user --abuse --user \"@Username\"\n"
+	abuseSyntaxAll = abuseSyntax
 
 	permSyntaxAdd    = ",permission  --add     --type \"Permission\"  --user \"@Username\"\n"
 	permSyntaxRemove = ",permission  --remove  --type \"Permission\"  --user \"@Username\"\n"
@@ -103,15 +99,14 @@ func (dat *IOdata) CoreUser() error {
 
 	// Generics
 	fl.FlagLong(&uflags.User, "user", 0, "Username")
-	fl.FlagLong(&uflags.Comment, "comment", 'c', "Ban Comment")
 	fl.FlagLong(&uflags.Type, "type", 't', "Type")
 	fl.FlagLong(&uflags.Help, "help", 'h', "This message")
-	fl.FlagLong(&uflags.List, "list", 0, "List all bans.")
+	fl.FlagLong(&uflags.List, "list", 0, "List all Abusers.")
 	fl.FlagLong(&uflags.Add, "add", 0, "Add")
 	fl.FlagLong(&uflags.Remove, "remove", 0, "Remove")
 
 	// Ban related.
-	fl.FlagLong(&uflags.Ban, "ban", 0, "Ban a user.")
+	fl.FlagLong(&uflags.BotAbuse, "abuse", 0, "Ban a user from the bot.")
 
 	// Gambling related.
 	fl.FlagLong(&uflags.Xfer, "xfer", 'x', "Xfer credits")
@@ -120,9 +115,6 @@ func (dat *IOdata) CoreUser() error {
 		fl.Flag(&uflags.Amount, 'n', "Amount (Number)")
 		fl.FlagLong(&uflags.All, "all", 0, "Gamble all Credits")
 	}
-
-	// Permission related.
-	fl.FlagLong(&uflags.Permission, "permission", 'p', "Permission Modification")
 
 	if err := fl.Getopt(dat.io, nil); err != nil {
 		return err
@@ -140,8 +132,8 @@ func (dat *IOdata) CoreUser() error {
 	var msg string
 	var err error
 	switch {
-	case uflags.Ban:
-		msg, err = u.Ban(dat.msg.ChannelID, uflags)
+	case uflags.BotAbuse:
+		err = u.BotAbuse(dat, dat.msg.ChannelID, uflags)
 	case uflags.Xfer:
 		msg, err = u.Transfer(uflags.Amount, uflags.User)
 	case uflags.Gamble:
@@ -151,8 +143,6 @@ func (dat *IOdata) CoreUser() error {
 			return ErrBadArgs
 		}
 		msg, err = u.Gamble(uflags.Amount)
-	case uflags.Permission:
-		msg, err = u.Permission(uflags)
 	default:
 		if uflags.Help {
 			dat.output = Help(fl, "", userSyntaxAll)
@@ -210,7 +200,6 @@ func UserUpdateSimple(serverID string, user *discordgo.User, inc int, ts time.Ti
 			u.Credits = 0
 			u.CreditsTotal = 0
 			u.LastSeen = ts
-			u.Access = append(u.Access, Access{ServerID: serverID, Permissions: permNormal})
 			if err := u.Update(); err != nil {
 				return err
 			}
@@ -250,7 +239,7 @@ func (u *User) Update() error {
 		"username":     u.Username,
 		"creditstotal": u.CreditsTotal,
 		"credits":      u.Credits,
-		"access":       u.Access,
+		"roles":        u.Roles,
 		"lastseen":     u.LastSeen,
 	}
 
@@ -367,308 +356,74 @@ func (ub UserBasic) StringPretty() string {
 	ACTIONS
 */
 
-// Ban will remove a player from the server
-func (u *User) Ban(cID string, fl userFlags) (string, error) {
-
+// BotAbuse will remove a player from being able to use the bot.
+func (u *User) BotAbuse(dat *IOdata, cID string, fl userFlags) error {
 	var err error
-	var uID, msg string
+	var uID string
 
-	// Properly format ID string given by the person performing the ban.
+	// Properly format ID string given by the person performing the ban to compare if they're banning themselves..
 	if fl.User != "" {
 		ids := strings.FieldsFunc(fl.User, idSplit)
 		uID = ids[0]
 	}
 
+	// Self-ban attempt.
 	if u.ID == uID {
-		return fmt.Sprintf("Oh c'mon <@%s>m that would just be silly...", u.ID), nil
+		dat.output = fmt.Sprintf("Oh c'mon <@%s> that would just be silly...", u.ID)
+		return nil
 	}
 
 	if err = u.Get(u.ID); err != nil {
-		return "", err
+		return err
 	}
 
-	if ok := u.HasPermission(fl.server, permAdmin); !ok {
-		return "", ErrBadPermissions
+	if ok := u.HasRoleType(dat.guildConfig, rolePermissionAdmin); !ok {
+		return ErrBadPermissions
 	} else if fl.Help {
-		prefix := "**Need** __type__ and __username__.\n\n"
-		return Help(fl.flag, prefix, banSyntaxAll), nil
+		prefix := "**Need** a __username__.\n\n"
+		dat.output = Help(fl.flag, prefix, abuseSyntaxAll)
+		return nil
 	} else if fl.List {
-		return banList(fl.serverName, fl.server)
+		if err = abuseList(dat, fl.serverName, fl.server); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	if (fl.Type == "soft" || fl.Type == "hard") && (uID != "") {
+	if uID != "" {
 		// Find user.
 		criminal := UserNew(nil)
 		if err = criminal.Get(uID); err != nil {
-			return "", err
-		}
-
-		// Create a new ban.
-		var b = criminal.BanNew()
-		b.ByLast = &UserBasic{ID: u.ID, Name: u.Username, Discriminator: u.Discriminator}
-
-		if fl.Type == "soft" {
-			if msg, err = b.banSoft(fl.server, cID, fl.Comment, fl.Remove); err != nil {
-				return "", err
-			}
-		} else if fl.Type == "hard" {
-			if msg, err = b.banHard(fl.server, cID, fl.Comment, fl.Remove); err != nil {
-				return "", err
-			}
-		}
-	} else if fl.Type == "bot" && uID != "" {
-		criminal := UserNew(nil)
-		if err = criminal.Get(uID); err != nil {
-			return "", err
-		}
-
-		msg = fmt.Sprintf("Bot access has been __**revoked**__ for <@%s>.", criminal.ID)
-		criminal.PermissionSet(fl.server, 0)
-		if fl.Remove {
-			criminal.PermissionAdd(fl.server, permNormal)
-			msg = fmt.Sprintf("Bot access has been __**restored**__ for <@%s>.", criminal.ID)
-		} else {
-			var b = criminal.BanNew()
-			if err := b.Get(fl.server); err != nil {
-				if err != mgo.ErrNotFound {
-					return "", err
-				}
-			}
-			b.Amount++
-			if err := b.Update(fl.server); err != nil {
-				return "", err
-			}
-		}
-		if err := criminal.Update(); err != nil {
-			return "", err
-		}
-		return msg, nil
-
-	} else {
-		prefix := "**Need** __type__ and __username__.\n\n"
-		return Help(fl.flag, prefix, banSyntaxAll), nil
-	}
-
-	return msg, nil
-
-}
-
-func (b *Ban) banSoft(database, cID, comment string, remove bool) (string, error) {
-	var msg string
-	if err := b.Get(database); err != nil {
-		if err == mgo.ErrNotFound {
-			if err := b.Update(database); err != nil {
-				return "", err
-			}
-		} else {
-			return "", err
-		}
-	}
-
-	if !remove {
-		for _, c := range b.Channels {
-			if c.ChannelID == cID {
-				return "", ErrBanChanExists
-			}
-		}
-
-		c := Bot.GetChannel(cID)
-
-		cNew := chanBan{
-			Name:      c.Name,
-			ChannelID: c.ID,
-			Comment:   comment,
-			By:        b.ByLast,
-			Date:      time.Now(),
-		}
-
-		b.Amount++
-		b.Channels = append(b.Channels, cNew)
-		b.Last = time.Now()
-		b.ByLast = nil
-
-		// Attempt permission changes here.
-		err := Bot.Session.ChannelPermissionSet(cID, b.User.ID, "member", 0, 2048)
-		if err != nil {
-			return "", err
-		}
-
-		if err := b.Update(database); err != nil {
-			return "", err
-		}
-
-		msg = fmt.Sprintf("<@%s> has **soft banned** <@%s> from the <#%s> channel.\n",
-			cNew.By.ID, b.User.ID, cID)
-
-	} else {
-		var found bool
-		var adminID string
-		for n, c := range b.Channels {
-			if c.ChannelID == cID {
-				found = true
-				copy(b.Channels[n:], b.Channels[n+1:])
-				b.Channels[len(b.Channels)-1] = chanBan{}
-				b.Channels = b.Channels[:len(b.Channels)-1]
-				adminID = c.By.ID
-			}
-		}
-		if !found {
-			return "", ErrBanNotFound
-		}
-		if err := Bot.Session.ChannelPermissionDelete(cID, b.User.ID); err != nil {
-			return "", err
-		}
-
-		if err := b.Update(database); err != nil {
-			return "", err
-		}
-
-		msg = fmt.Sprintf("<@%s> has **removed** <@%s>'s soft ban for the <#%s> channel.\n",
-			adminID, b.User.ID, cID)
-	}
-
-	return msg, nil
-}
-
-func (b *Ban) banHard(database, cID, comment string, remove bool) (string, error) {
-	var msg string
-	if err := b.Get(database); err != nil {
-		if err == ErrScriptNotFound {
-			if err := b.Update(database); err != nil {
-				return "", err
-			}
-		}
-		return "", err
-	}
-
-	gID, err := Bot.GetGuildID(cID)
-	if err == godbot.ErrNotFound {
-		return "", errors.New("Seems something happened getting Guild ID")
-	}
-
-	if !remove {
-		if err := Bot.Session.GuildBanCreateWithReason(gID, b.User.ID, comment, 1); err != nil {
-			return "", err
-		}
-		msg = fmt.Sprintf("<@%s> has **banned** %s from the server.\n Sucks to suck.",
-			b.ByLast.ID, b.User.Name)
-		return msg, nil
-	}
-
-	if err := Bot.Session.GuildBanDelete(gID, b.User.ID); err != nil {
-		return "", err
-	}
-	msg = fmt.Sprintf("<@%s> has **banned** %s from the server.\n Sucks to suck.",
-		b.ByLast.ID, b.User.Name)
-
-	return msg, nil
-}
-
-// BanNew creates a new instance of a Ban.
-func (u *User) BanNew() *Ban {
-	var ub = &UserBasic{
-		ID:            u.ID,
-		Name:          u.Username,
-		Discriminator: u.Discriminator,
-	}
-	return &Ban{
-		User:   ub,
-		ByLast: nil,
-		Amount: 0,
-	}
-}
-
-// Get a ban object from Database.
-func (b *Ban) Get(database string) error {
-	var q = make(map[string]interface{})
-	q["user.id"] = b.User.ID
-
-	dbdat := DBdataCreate(database, CollectionBlacklist, Ban{}, q, nil)
-	err := dbdat.dbGet(Ban{})
-	if err != nil {
-		if err == mgo.ErrNotFound {
 			return err
 		}
-		return err
+
+		// Apply the role to the user on Discord.
+		roleID := dat.guildConfig.RoleIDGet(0)
+		if roleID == "" {
+			return errors.New("Unable to find role to apply to newly banned used")
+		}
+		if err := Bot.Session.GuildMemberRoleAdd(dat.guildConfig.ID, criminal.ID, roleID); err != nil {
+			return err
+		}
+
+		// Apply the banned role to the user in memory.
+		criminal.RoleAdd(roleID)
+
+		// Apply the role to the user in the database.
+		if err := criminal.Update(); err != nil {
+			return err
+		}
+
+		dat.output = fmt.Sprintf("Bot access has been __**revoked**__ for <@%s>.", criminal.ID)
+		return nil
 	}
 
-	var ban Ban
-	ban = dbdat.Document.(Ban)
-	*b = ban
+	return errors.New("Need to supply a user")
 
-	return nil
 }
 
-// Update database with new information.
-func (b *Ban) Update(database string) error {
-	var q = make(map[string]interface{})
-	var c = make(map[string]interface{})
-	q["user.id"] = b.User.ID
-	c["$set"] = bson.M{
-		"channels": b.Channels,
-		"amount":   b.Amount,
-		"bylast":   nil,
-		"last":     b.Last,
-	}
-
-	dbdat := DBdataCreate(database, CollectionBlacklist, b, q, c)
-	err := dbdat.dbEdit(Ban{})
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
-		}
-		return err
-	}
-
+func abuseList(dat *IOdata, database, id string) error {
 	return nil
-}
-
-func banList(database, id string) (string, error) {
-	var msg string
-
-	db := DBdataCreate(database, CollectionBlacklist, Ban{}, nil, nil)
-	if err := db.dbGetAll(Ban{}); err != nil {
-		return "", err
-	}
-
-	msg = "List of current Soft Bans:\n\n"
-	// Convert here.
-	if len(db.Documents) == 0 {
-		return "List is empty.", nil
-	}
-
-	var b Ban
-	var found bool
-	for _, criminal := range db.Documents {
-		var botban bool
-		b = criminal.(Ban)
-		u := UserNew(nil)
-		if err := u.Get(b.User.ID); err != nil {
-			fmt.Println("Could not get user while getting ban list", err.Error())
-		}
-		if !u.HasPermission(id, permNormal) {
-			botban = true
-		}
-
-		if len(b.Channels) > 0 || botban {
-			found = true
-			msg += fmt.Sprintf("\t__**%s**#%s__\n", b.User.Name, b.User.Discriminator)
-			if botban {
-				msg += "\t\t**Bot Banned.**\n"
-			}
-			for _, c := range b.Channels {
-				msg += fmt.Sprintf("\t\tChannel: **%s**, Comment: **%s**\n", c.Name, c.Comment)
-			}
-		}
-	}
-
-	if !found {
-		return "List is empty.", nil
-	}
-	return msg, nil
 }
 
 /*
@@ -795,183 +550,66 @@ func gambleAlgorithm(l, d, t, credits int) int {
 	ACTIONS
 */
 
-// Permission handles Adding and Removing permissions for a user.
-func (u *User) Permission(fl userFlags) (string, error) {
-
-	if ok := u.HasPermission(fl.server, permAdmin); !ok {
-		return "", ErrBadPermissions
-	} else if fl.Help {
-		// Print Help + Syntax
-		pre := "Requires an Action and an @User\n\n"
-		return Help(fl.flag, pre, permSyntaxAll), nil
-	} else if fl.List {
-		// List users with non-default permissions.
-		return "Listing hasn't been added yet.", nil
-
-	}
-
-	var msg string
-	if (fl.Add || fl.Remove) && fl.Type != "" {
-		if fl.User == "" {
-			// Add permission Syntax help
-			return permSyntaxAdd, nil
-		}
-		ids := strings.FieldsFunc(fl.User, idSplit)
-		id := ids[0]
-		// Get Permission Number
-		var perm = permInt(fl.Type)
-		if perm == 0 {
-			return "Bad permission\n" + permList(), nil
-		}
-		// Add permission
-		user := UserNew(nil)
-		if err := user.Get(id); err != nil {
-			return "", err
-		}
-		if fl.Add {
-			user.PermissionAdd(fl.server, perm)
-			if err := user.Update(); err != nil {
-				return "", err
-			}
-			msg = fmt.Sprintf("%s has added the __**%s**__ permission to %s", u.StringPretty(), fl.Type, user.StringPretty())
-		} else {
-			user.PermissionDelete(fl.server, perm)
-			if err := user.Update(); err != nil {
-				return "", err
-			}
-			msg = fmt.Sprintf("%s has removed the __**%s**__ permission from %s", u.StringPretty(), fl.Type, user.StringPretty())
-		}
-	} else {
-		pre := "Requires an Action and an @User\n\n"
-		// Print Help here.
-		return Help(fl.flag, pre, permSyntaxAll), nil
-	}
-	// Return result/text and nil error.
-	return msg, nil
-}
-
-// HasPermission returns True if have permissions for action, false if not.
-func (u *User) HasPermission(serverID string, access int) bool {
-	var found bool
-	var loc int
-	for n, s := range u.Access {
-		if s.ServerID == serverID {
-			found = true
-			loc = n
+// HasRole will check if a particular user has a role assigned in discord.
+func (u *User) HasRole(roleID string) bool {
+	for _, r := range u.Roles {
+		if r == roleID {
+			return true
 		}
 	}
-
-	if found {
-		return u.Access[loc].Permissions&access == access
-	}
-
-	u.Access = append(u.Access, Access{ServerID: serverID, Permissions: permNormal})
 	return false
 }
 
-// HasPermissionGTE to what is suppled. (Greater Than or Equal)
-func (u *User) HasPermissionGTE(serverID string, access int) bool {
-	var found bool
-	var loc int
-	for n, s := range u.Access {
-		if s.ServerID == serverID {
-			found = true
-			loc = n
-		}
+// HasRoleType checks if the user has a specific type of role.
+func (u *User) HasRoleType(guildConfig *GuildConfig, base int) bool {
+	// Get the role ID.
+	var roleID string
+	if roleID = guildConfig.RoleIDGet(base); roleID == "" {
+		return false
 	}
 
-	if found {
-		return u.Access[loc].Permissions >= access
-	}
-
-	return false
+	// Return based on if the user has the role or not.
+	return u.HasRole(roleID)
 }
 
-// PermissionAdd upgrades a user to new permissions
-func (u *User) PermissionAdd(serverID string, access int) {
-	for n, s := range u.Access {
-		if s.ServerID == serverID {
-			u.Access[n].Permissions |= access
+// RoleAddByType will grant a user a role based on it's type and not ID.
+func (u *User) RoleAddByType(guildConfig *GuildConfig, base int) error {
+	// Get the role ID.
+	var roleID string
+	if roleID = guildConfig.RoleIDGet(base); roleID == "" {
+		return ErrBadPermissions
+	}
+
+	u.RoleAdd(roleID)
+	return nil
+}
+
+// RoleAdd to a user.
+func (u *User) RoleAdd(roleID string) {
+	for _, r := range u.Roles {
+		if r == roleID {
 			return
 		}
 	}
-
-	u.Access = append(u.Access, Access{ServerID: serverID, ServerName: "", Permissions: permNormal | access})
+	u.Roles = append(u.Roles, roleID)
 	return
 }
 
-// PermissionDelete strips a permission from an User
-func (u *User) PermissionDelete(serverID string, access int) {
-	for n, s := range u.Access {
-		if s.ServerID == serverID {
-			u.Access[n].Permissions ^= access
+// RoleRemove from a user.
+func (u *User) RoleRemove(roleID string) {
+	for n, r := range u.Roles {
+		if r == roleID {
+			if len(u.Roles) == 1 {
+				u.Roles = nil
+				return
+			}
+
+			u.Roles[n] = u.Roles[len(u.Roles)-1]
+			u.Roles = u.Roles[:len(u.Roles)-1]
 			return
 		}
 	}
-
-	newPerm := Access{ServerID: serverID, ServerName: "", Permissions: permNormal}
-	newPerm.Permissions ^= access
-	u.Access = append(u.Access, newPerm)
-
 	return
-}
-
-// PermissionSet assigns a specific access level.
-func (u *User) PermissionSet(serverID string, access int) {
-	for n, s := range u.Access {
-		if s.ServerID == serverID {
-			u.Access[n].Permissions = access
-			return
-		}
-	}
-
-	newPerm := Access{ServerID: serverID, ServerName: "", Permissions: access}
-	u.Access = append(u.Access, newPerm)
-
-	return
-}
-
-// Convert a Permission from a String to an Int.
-func permInt(p string) int {
-	switch strings.ToLower(p) {
-	case "admin":
-		return permAdmin
-	case "mod", "moderator":
-		return permModerator
-	default:
-		return 0
-	}
-}
-
-// Convert a Permission from an Int to a String.
-func permString(p int) string {
-	var permissions string
-	for p > 0 {
-		switch {
-		case p&permAscended == permAscended:
-			p ^= permAscended
-			permissions += "Ascended "
-		case p&permAdmin == permAdmin:
-			p ^= permAdmin
-			permissions += "Admin "
-		case p&permModerator == permModerator:
-			p ^= permModerator
-			permissions += "Moderator "
-		case p&permNormal == permNormal:
-			p ^= permNormal
-			permissions += "Base "
-		default:
-			// Unknown permission, break infinite loop.
-			break
-		}
-	}
-	perm := strings.Fields(permissions)
-	return strings.Join(perm, ", ")
-}
-
-// Prints Permissions that can be modified.
-func permList() string {
-	return "Admin -> Ban permissions, special commands\nMod/Moderator -> Add Events\n"
 }
 
 /*

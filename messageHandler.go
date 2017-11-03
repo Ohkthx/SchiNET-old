@@ -95,8 +95,8 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 	// Load guild config. Add and update if not found. Shouldn't happen due to new
 	// guilds being processed upon adding.
 	gConf := cfg.GuildConfigByID(g.ID)
-	if gConf.ID == "" {
-		gConf = GuildConfig{ID: g.ID, Name: g.Name, Prefix: envCMDPrefix}
+	if gConf == nil {
+		gConf = newGuildConfig(g.ID, g.Name)
 		if err = cfg.GuildConfigManager(gConf); err != nil {
 			fmt.Println(err)
 			return
@@ -108,41 +108,47 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 		fmt.Println(err)
 	}
 
-	var io = msgToIOdata(m, gConf.Prefix)
-	io.guild = g
+	dat := msgToIOdata(m, gConf.Prefix)
+	dat.guild = g
+	dat.guildConfig = gConf
 
 	// Handle the message appropriately if it is a message between alliances.
 	cfg.allianceHandler(m.Message)
 
 	// Handle potential WatchLogs
-	cfg.watchLogHandler(io.guild, m, c.Name)
+	cfg.watchLogHandler(dat.guild, m, c.Name)
 
 	// Return due to not being a command and/or just an Embed.
-	if io.command == false || len(io.io) == 0 {
+	if dat.command == false || len(dat.io) == 0 {
 		return
 	}
 
-	io.user = UserNew(m.Author)
-	if err := io.user.Get(m.Author.ID); err != nil {
+	dat.user = UserNew(m.Author)
+	if err := dat.user.Get(m.Author.ID); err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// Return if the user is in the ban role.
+	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionBan); ok {
+		return
+	}
+
 	// Handle the parse the various commands the message can be.
-	err = cfg.ioHandler(io)
+	err = cfg.ioHandler(dat)
 	if err != nil {
-		io.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)
+		dat.msgEmbed = embedCreator(fmt.Sprintf("%s", err.Error()), ColorMaroon)
 	}
 	// Prevention from attempting access of null pointer from console.
-	if io.msg != nil && io.rm {
-		s.ChannelMessageDelete(io.msg.ChannelID, io.msg.ID)
+	if dat.msg != nil && dat.rm {
+		s.ChannelMessageDelete(dat.msg.ChannelID, dat.msg.ID)
 	}
 
 	// Send message here.
-	if io.output != "" {
-		s.ChannelMessageSend(m.ChannelID, io.output)
-	} else if io.msgEmbed != nil {
-		s.ChannelMessageSendEmbed(m.ChannelID, io.msgEmbed)
+	if dat.output != "" {
+		s.ChannelMessageSend(m.ChannelID, dat.output)
+	} else if dat.msgEmbed != nil {
+		s.ChannelMessageSendEmbed(m.ChannelID, dat.msgEmbed)
 	}
 
 	return
@@ -248,82 +254,6 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 	}
 
 	return
-}
-
-// guildMemberAddHandler greets a new palyers to the channel.
-func (cfg *Config) guildMemberAddHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
-	if Bot != nil {
-		c := Bot.GetMainChannel(nu.GuildID)
-		msg := fmt.Sprintf("Welcome to the server, __**%s**#%s__!", nu.User.Username, nu.User.Discriminator)
-		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
-
-		for _, ch := range Bot.Channels {
-			if ch.Name == "internal" && ch.GuildID == nu.GuildID {
-				tn := time.Now()
-				msg := fmt.Sprintf("__**%s**#%s__ [ID: %s] joined the server @ %s\n",
-					nu.User.Username, nu.User.Discriminator, nu.User.ID, tn.Format(time.UnixDate))
-				s.ChannelMessageSendEmbed(ch.ID, embedCreator(msg, ColorGreen))
-				return
-			}
-		}
-	}
-}
-
-// guildMemberRemoveHandler notifies of a leaving user (NOT CURRENTLY WORKING)
-func (cfg *Config) guildMemberRemoveHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
-	if Bot != nil {
-		for _, c := range Bot.Channels {
-			if c.Name == "internal" && c.GuildID == du.GuildID {
-				tn := time.Now()
-				msg := fmt.Sprintf("__**%s**#%s__ [ID: %s] left the server @ %s\n",
-					du.User.Username, du.User.Discriminator, du.User.ID, tn.Format(time.UnixDate))
-				s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorMaroon))
-				return
-			}
-		}
-	}
-}
-
-// watchLogHandler tracks if the message is under WatchLog.
-func (cfg *Config) watchLogHandler(guild *godbot.Guild, msg *discordgo.MessageCreate, channel string) {
-	// TAG: TODO - account for watched servers that have same guild, but not same channel.
-	// Verify we have a watchlogger on this guild.
-	var guildID string
-	var watched WatchLog
-	// Check if private messages are being WatchLogged.
-	if guild == nil && channel == "private" {
-		guildID = "private"
-		channel = ""
-	} else if guild == nil {
-		// Guild is nil, return to prevent accessing nil memory.
-		return
-	} else {
-		guildID = guild.ID
-	}
-
-	// Cycle thru our WatchLogs.
-	for _, w := range cfg.watched {
-		if w.guildID == guildID {
-			watched = w
-			break
-		}
-	}
-
-	// Return since guild ID isn't being watched.
-	if watched.guildID == "" {
-		return
-	}
-
-	// If this isn't the correct channel, return.
-	if strings.ToLower(watched.channelName) != strings.ToLower(channel) && !watched.channelAll {
-		return
-	}
-
-	// Create output.
-	output := watched.MessageCreate(msg.Author.Username, msg.Author.Discriminator, channel, msg.ContentWithMentionsReplaced())
-
-	// Send the composed message.
-	watched.Talk(output)
 }
 
 // messageLogger logs the supplied message into a local database.

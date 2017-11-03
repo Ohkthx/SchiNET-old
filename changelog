@@ -1,3 +1,19 @@
+0.8.0 - Additions:
+            - Swapped the permission scheme to be based on discord roles.
+            - Banning changed to Abuse for users who are abusing the bot.
+            - Debug flag added.
+            - printDebug() function added to that interacts with the -debug flag.
+            - Admin commands
+                - Reset sets the bot to the defaults
+                - Prefix assigns a new command prefix
+                - Nick assigns the new display name to the bot
+                - Grant gives a user a role.
+        Fixes:
+            - Alias issue resolved, cmdPrefix wasn't being assigned.
+            - Moved all handlers to handlers.go
+            - Ally moved to being a moderator permission.
+            - Removed "ban" structs.
+
 0.7.2 - Additions:
             - WatchLog: Request prior messages from database to be displayed.
             - WatchLog: Can now display private messages.

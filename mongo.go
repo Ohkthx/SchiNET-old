@@ -307,10 +307,6 @@ func handlerForInterface(handler interface{}, i interface{}) (interface{}, error
 		var s Script
 		bson.Unmarshal(byt, &s)
 		return s, nil
-	case Ban:
-		var b Ban
-		bson.Unmarshal(byt, &b)
-		return b, nil
 	case Message:
 		var m Message
 		bson.Unmarshal(byt, &m)

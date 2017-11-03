@@ -20,7 +20,7 @@ type Config struct {
 	DSession *discordgo.Session
 
 	// Server Configs
-	GuildConf []GuildConfig
+	GuildConf []*GuildConfig
 
 	// Alliance slices
 	Alliances []Alliance
@@ -47,10 +47,11 @@ type IOdata struct {
 	input     string
 	output    string
 
-	user     *User
-	guild    *godbot.Guild
-	msg      *discordgo.MessageCreate
-	msgEmbed *discordgo.MessageEmbed
+	user        *User
+	guild       *godbot.Guild
+	guildConfig *GuildConfig
+	msg         *discordgo.MessageCreate
+	msgEmbed    *discordgo.MessageEmbed
 }
 
 // GuildConfig is used to save basic information regarding if a guild is active or not.
@@ -58,7 +59,16 @@ type GuildConfig struct {
 	ID     string
 	Name   string
 	Init   bool
+	Roles  []Role
 	Prefix string // Command prefix. Defaults to: ","
+}
+
+// Role is a struct containing special roles maintained by the bot.
+type Role struct {
+	ID    string `bson:"id"`
+	Name  string
+	Value int // Modified permissions
+	Base  int // Stock permissions
 }
 
 // Message holds basic information related to a specific message.
@@ -86,7 +96,7 @@ type Event struct {
 	AddedBy     UserBasic
 }
 
-// EventSmall -er version of Events.
+// EventSmall -er version of Events, used for display.
 type EventSmall struct {
 	Hours       int
 	Minutes     int
@@ -99,7 +109,7 @@ type User struct {
 	ID            string `bson:"id"`
 	Username      string
 	Discriminator string
-	Access        []Access
+	Roles         []string
 	Bot           bool
 	Credits       int
 	CreditsTotal  int
@@ -111,15 +121,6 @@ type Access struct {
 	ServerID    string
 	ServerName  string
 	Permissions int
-}
-
-// Ban contains data pertaining to a ban.
-type Ban struct {
-	User     *UserBasic
-	Channels []chanBan
-	Amount   int
-	ByLast   *UserBasic
-	Last     time.Time `bson:"last"`
 }
 
 type chanBan struct {

@@ -103,7 +103,7 @@ func (dat *IOdata) CoreTickets() error {
 			return err
 		}
 
-		if t.AddedBy.ID != dat.user.ID || dat.user.HasPermissionGTE(t.Server, permAdmin) {
+		if t.AddedBy.ID != dat.user.ID || dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin) {
 			return ErrBadPermissions
 		}
 
@@ -130,7 +130,7 @@ func (dat *IOdata) CoreTickets() error {
 		if err := t.Get(tID); err != nil {
 			return err
 		}
-		if t.AddedBy.ID != dat.user.ID || dat.user.HasPermissionGTE(t.Server, permAdmin) {
+		if t.AddedBy.ID != dat.user.ID || dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin) {
 			return ErrBadPermissions
 		}
 		if note == "" {

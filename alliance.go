@@ -59,6 +59,11 @@ func (cfg *Config) CoreAlliance(dat *IOdata) error {
 		}
 	}
 
+	// Return if the user does not have the role
+	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionMod); !ok {
+		return ErrBadPermissions
+	}
+
 	// Prevent issues with mistyping case.
 	if name != "" {
 		name = strings.ToLower(name)
@@ -79,9 +84,7 @@ func (cfg *Config) CoreAlliance(dat *IOdata) error {
 		dat.msgEmbed = embedCreator(passkey, ColorGreen)
 		return nil
 	} else if delete {
-		if ok := dat.user.HasPermissionGTE(dat.guild.Name, permModerator); !ok {
-			return ErrBadPermissions
-		}
+
 		if err := cfg.AllianceBreak(name); err != nil {
 			return err
 		}

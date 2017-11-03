@@ -143,7 +143,8 @@ func (dat *IOdata) histograph(s *discordgo.Session) error {
 	var snd string
 	var mp = make(map[int]map[int]int)
 
-	if ok := dat.user.HasPermission(dat.guild.ID, permAdmin); !ok {
+	// Return if the user does not have the role
+	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin); !ok {
 		return ErrBadPermissions
 	}
 
@@ -298,7 +299,8 @@ func (dat *IOdata) ChannelCore() error {
 	var msg string
 	var ch = ChannelNew(dat.msg.ChannelID, dat.guild.Name)
 
-	if !dat.user.HasPermissionGTE(dat.guild.ID, permAdmin) {
+	// Return if the user does not have the role
+	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin); !ok {
 		return ErrBadPermissions
 	}
 

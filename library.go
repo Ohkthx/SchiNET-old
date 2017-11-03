@@ -105,7 +105,8 @@ func (dat *IOdata) CoreLibrary() error {
 	} else if remove && name != "" {
 		// Ability to delete as a moderator with specifying the --user flag.
 		if user != "" {
-			if ok := dat.user.HasPermission(dat.guild.ID, permModerator); !ok {
+			// Return if the user does not have the role
+			if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionMod); !ok {
 				return ErrBadPermissions
 			}
 			lib.Script.Author.Name = user

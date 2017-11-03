@@ -56,7 +56,8 @@ func (dat *IOdata) CoreAlias() error {
 		}
 	}
 
-	if !u.HasPermission(dat.guild.ID, permModerator) {
+	// Return if the user does not have the role
+	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionMod); !ok {
 		return ErrBadPermissions
 	}
 
@@ -74,7 +75,7 @@ func (dat *IOdata) CoreAlias() error {
 				return err
 			}
 			// Alias added at this point.
-			msg := fmt.Sprintf("%s added an alias. **%s** -> **%s**", u.StringPretty(), caller, linked)
+			msg := fmt.Sprintf("%s added an alias. \n**%s** -> **%s**", u.StringPretty(), caller, linked)
 			dat.msgEmbed = embedCreator(msg, ColorGreen)
 			return nil
 		} else if remove {

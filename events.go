@@ -76,7 +76,8 @@ func (dat *IOdata) CoreEvent() error {
 	}
 
 	if (add || edit || del) && day != "" {
-		if ok := dat.user.HasPermission(dat.guild.ID, permAdmin); !ok {
+		// Return if the user does not have the role
+		if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin); !ok {
 			return ErrBadPermissions
 		}
 		var err error
