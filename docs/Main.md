@@ -42,10 +42,10 @@ MIT
 [//]: # (These are reference links used in the body of this note and get stripped out when the markdown processor does its job. There is no need to format nicely because it shouldn't be seen. Thanks SO - http://stackoverflow.com/questions/4823468/store-comments-in-markdown-syntax)
 [//]: # (Guide Links:)
 [Home]: <https://github.com/d0x1p2/SchiNET/>
-[MainDoc]: <https://github.com/d0x1p2/SchiNET/Main.md>
-[AdminDoc]: <https://github.com/d0x1p2/SchiNET/docs/Admin.md>
-[ModeratorDoc]: <https://github.com/d0x1p2/SchiNET/docs/Moderator.md>
-[UserDoc]: <https://github.com/d0x1p2/SchiNET/docs/User.md>
+[MainDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md>
+[AdminDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Admin.md>
+[ModeratorDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Moderator.md>
+[UserDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md>
 [//]: # (Projects:)
 [discordgo]: <https://github.com/bwmarrin/discordgo>
 [mgo]: <https://github.com/go-mgo/mgo>

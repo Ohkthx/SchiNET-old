@@ -335,7 +335,11 @@ func globalHelp() string {
 			msg += fmt.Sprintf("\n\t%s\n\t\t%s", c, txt)
 		}
 	}
-	return "```" + msg + "```"
+
+	var msg2 string
+	msg2 += "\n\nThe easy-to-use Documentation can be found at: "
+	msg2 += "https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md"
+	return "```" + msg + "```" + msg2
 }
 
 // msgSize is a small function intended to gauge a rough size of what a discord message is.

@@ -78,4 +78,4 @@ This project does capture, store, and has abilities to audit message traffic to 
 
 See [changelog](https://github.com/d0x1p2/SchiNET/blob/master/changelog)
 
-[Doc]: <https://github.com/d0x1p2/SchiNET/docs/Main.md>
+[Docs]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md>

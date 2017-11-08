@@ -1,3 +1,8 @@
+0.8.4 - Additions:
+            - Documentation link added to README.md and 'help' via PM/DM
+        Fixes:
+            - Links are not working correctly on github for help pages.
+
 0.8.3 - Additions:
             - Project renamed from usmbot to SchiNET.
             - README.md updates!

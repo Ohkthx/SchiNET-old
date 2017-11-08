@@ -85,11 +85,11 @@ SchiNET's source is available at the [Main][Home] page!
 
 [//]: # (Guide Links:)
 [Home]: <https://github.com/d0x1p2/SchiNET/>
-[MainDoc]: <https://github.com/d0x1p2/SchiNET/Main.md>
-[AdminDoc]: <https://github.com/d0x1p2/SchiNET/docs/Admin.md>
-[ModeratorDoc]: <https://github.com/d0x1p2/SchiNET/docs/Moderator.md>
-[UserDoc]: <https://github.com/d0x1p2/SchiNET/docs/User.md>
-[UserScripts]: <https://github.com/d0x1p2/SchiNET/docs/User.md#Script>
-[UserTickets]: <https://github.com/d0x1p2/SchiNET/docs/User.md#Ticket>
+[MainDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md>
+[AdminDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Admin.md>
+[ModeratorDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Moderator.md>
+[UserDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md>
+[UserScripts]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md#Script>
+[UserTickets]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md#Ticket>
 [//]: # (Other Links:)
 [discord_server]: <https://https://discord.gg/GpHDxx6>
