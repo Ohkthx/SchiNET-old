@@ -36,6 +36,9 @@ func (conf *Config) CoreAdmin(dat *IOdata) error {
 		// Reset Guild Config here... update.
 		update = true
 		dat.guildConfig.Prefix = envCMDPrefix
+		if err := conf.Core.SetNickname(dat.guild.ID, "", false); err != nil {
+			return err
+		}
 	} else if arg == "prefix" {
 		if len(dat.io) < 3 {
 			return ErrBadArgs
@@ -70,26 +73,29 @@ func (conf *Config) CoreAdmin(dat *IOdata) error {
 		}
 
 		// Grant the role to the admin via discord.
-		if err := conf.DSession.GuildMemberRoleAdd(dat.guild.ID, user.ID, roleID); err != nil {
+		if err := conf.Core.Session.GuildMemberRoleAdd(dat.guild.ID, user.ID, roleID); err != nil {
 			return err
 		}
 
-		user.RoleAdd(roleID)
+		user.RoleAdd(dat.guild.ID, roleID)
 		if err := user.Update(); err != nil {
 			return err
 		}
 
 		dat.output = "Role granted."
-
+	} else if arg == "channel" {
+		return dat.ChannelCore()
 	} else if arg == "help" {
 		dat.output = fmt.Sprintf("Admin Help:\n"+
-			"```%-23s - %s\n"+
-			"%-23s - %s\n"+
-			"%-23s - %s\n"+
-			"%-23s - %s\n```",
+			"```%s\n\t - %s\n"+
+			"%s\n\t - %s\n"+
+			"%s\n\t - %s\n"+
+			"%s\n\t - %s\n"+
+			"%s\n\t - %s\n```",
 			"admin reset", "Resets to the bot's defaults.",
 			"admin prefix [prefix]", "Sets the bots command prefix to the desired.",
 			"admin nick [new_nick]", "Assigns a new name to the bot.",
+			"admin channel enable/disable", " Enable or disable bot commands in the channel.",
 			"admin grant [role] [id]", "Grants either an Admin or Moderator role to a user.")
 		return nil
 	}
@@ -106,7 +112,7 @@ func (conf *Config) CoreAdmin(dat *IOdata) error {
 
 // createGuildRoles for a new guild.
 func (conf *Config) createGuildRoles(guildConfig *GuildConfig, guildID string) error {
-	session := conf.DSession
+	session := conf.Core.Session
 	if session == nil {
 		return errors.New("Session is nil when creating roles")
 	}
@@ -175,7 +181,7 @@ func (conf *Config) createGuildRoles(guildConfig *GuildConfig, guildID string) e
 
 // guildPermissionAdd  Adds a role to a user.
 func (conf *Config) guildPermissionAdd(guildID, userID, roleID string) error {
-	session := conf.DSession
+	session := conf.Core.Session
 	if session == nil {
 		return errors.New("Nil session while adding permissions")
 	}
@@ -186,7 +192,7 @@ func (conf *Config) guildPermissionAdd(guildID, userID, roleID string) error {
 
 // guildPermissionRemove Removes a permission for a user.
 func (conf *Config) guildPermissionRemove(guildID, userID, roleID string) error {
-	session := conf.DSession
+	session := conf.Core.Session
 	if session == nil {
 		return errors.New("Nil session while removing permissions")
 	}
@@ -208,7 +214,7 @@ func (conf *Config) GuildConfigLoad() error {
 						return err
 					}*/
 				ng := &discordgo.GuildCreate{Guild: g}
-				conf.guildCreateHandler(conf.DSession, ng)
+				conf.guildCreateHandler(conf.Core.Session, ng)
 				return nil
 			}
 			return err
@@ -387,4 +393,158 @@ func (g *GuildConfig) RoleAdd(roleID, roleOldID, roleName string, value, base in
 	}
 
 	return
+}
+
+// RoleCorrection verifies roles are as they should be upon last save.
+func (g *GuildConfig) RoleCorrection(s *discordgo.Session) error {
+	// Make sure we're not accessing a nil session:
+	if s == nil {
+		return errors.New("Session is nil when performing Role Correction")
+	}
+
+	// Get our potentially updated roles for the guild from the server.
+	dRoles, err := s.GuildRoles(g.ID)
+	if err != nil {
+		return err
+	}
+
+	// Iterate our known roles.
+	for n, role := range g.Roles {
+		var roleFound *discordgo.Role
+		for _, r := range dRoles {
+			if role.ID == r.ID {
+				// Found our role, break inner loop to process.
+				roleFound = r
+				break
+			}
+		}
+
+		// If it exists, check permissions. If not... recreate.
+		if roleFound != nil {
+			if roleFound.Permissions&role.Base != role.Base || roleFound.Name != role.Name {
+				newValue := roleFound.Permissions | role.Base
+				_, err = s.GuildRoleEdit(g.ID, role.ID, role.Name, roleFound.Color, roleFound.Hoist, newValue, roleFound.Mentionable)
+				if err != nil {
+					return err
+				}
+				// Update the running permission value if editting succeeded.
+				g.Roles[n].Value = newValue
+			}
+			continue
+		}
+
+		// If it wasn't found... recreate it.
+		newRole, err := s.GuildRoleCreate(g.ID)
+		if err != nil {
+			return err
+		}
+
+		// Modify to correct permissions.
+		_, err = s.GuildRoleEdit(g.ID, newRole.ID, role.Name, newRole.Color, newRole.Hoist, role.Value, newRole.Mentionable)
+		if err != nil {
+			return err
+		}
+
+		// Add the new role.
+		g.RoleAdd(newRole.ID, role.ID, role.Name, role.Value, role.Base)
+	}
+
+	return nil
+}
+
+// InternalCorrection verifies an internal channel exists. If not, it recreates it.
+func (conf *Config) InternalCorrection(guildID string) error {
+	// Attempt to find a pre-existing #internal
+	var internal *discordgo.Channel
+	for _, ch := range conf.Core.Links[guildID] {
+		if ch.Name == "internal" {
+			internal = ch
+			break
+		}
+	}
+
+	var err error
+	// Channel doesn't exists... needs to be created.
+	if internal == nil {
+		if internal, err = conf.Core.Session.GuildChannelCreate(guildID, "internal", "text"); err != nil {
+			return err
+		}
+		conf.Core.ChannelMemoryAdd(internal)
+	}
+
+	if len(internal.PermissionOverwrites) == 0 {
+		if err := conf.Core.Session.ChannelPermissionSet(internal.ID, guildID, "role", 0, 0x00000400); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Check if the permissions are right... if not- update.
+	for _, p := range internal.PermissionOverwrites {
+		if p.ID == guildID {
+			// This is @everyone (matches Guild ID) check the permissions.
+			if p.Deny&0x00000400 != 0x00000400 {
+				// Permission isn't set correctly, update.
+				if p.Allow&0x00000400 == 0x00000400 {
+					p.Allow ^= 0x00000400
+				}
+				if err := conf.Core.Session.ChannelPermissionSet(internal.ID, p.ID, p.Type, p.Allow, p.Deny|0x00000400); err != nil {
+					return err
+				}
+				return nil
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+// MemberCorrection checks all members and their roles and corrects them in the database.
+func (conf *Config) MemberCorrection() error {
+	core := conf.Core
+	// Process each guild.
+	for _, g := range core.Guilds {
+		// Pull all users of the guild.
+		users, err := core.GetGuildMembers(g.ID, g.MemberCount)
+		if err != nil {
+			fmt.Println("Pulling guild members: " + err.Error())
+			// Continue because we can try to process other guilds.
+			continue
+		}
+
+		// Process the users.
+		for _, u := range users {
+			// Pull the User from the database to update guild specific information.
+			user := UserNew(u.User)
+			if err := user.Get(u.User.ID); err != nil {
+				if err != mgo.ErrNotFound {
+					// Skip and try the next one.
+					// TAG: TODO - Send this to error log for MongoDB.
+					fmt.Println(err)
+					continue
+				}
+			}
+
+			// Replace or append the new roles.
+			if len(user.GuildRoles) > 0 {
+				for n, gr := range user.GuildRoles {
+					if gr.ID == g.ID {
+						user.GuildRoles[n] = GuildRole{ID: g.ID, Name: g.Name, Roles: u.Roles}
+						break
+					}
+				}
+			} else {
+				user.GuildRoles = append(user.GuildRoles, GuildRole{ID: g.ID, Name: g.Name, Roles: u.Roles})
+			}
+
+			// Update the user.
+			if err := user.Update(); err != nil {
+				// TAG: TODO - Log for MongoDB
+				fmt.Println(err)
+				continue
+			}
+		}
+	}
+
+	return nil
 }

@@ -432,7 +432,7 @@ func (watch WatchLog) Talk(msg string) {
 }
 
 func consoleHelp() string {
-	text := [...]string{"check", "watch", "reset", "kill", "help"}
+	text := [...]string{"check", "watch", "reset", "kill", "help", "exit"}
 
 	var retText string
 	for n, w := range text {

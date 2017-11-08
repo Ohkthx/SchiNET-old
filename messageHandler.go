@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/bwmarrin/discordgo"
@@ -18,32 +19,26 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 	var err error
 	var c *godbot.Channel
 	var g *godbot.Guild
-	cfg.DSession = s
 
 	// Required for storing information in the correct database.
-	if Bot != nil {
-		// Prevents accessing nil pointers and crashing bot.
-		if c = Bot.GetChannel(m.ChannelID); c == nil {
-			c = &godbot.Channel{}
-			// If c is nil, it is most likely a private channel, grab via API.
-			if c.Channel, err = s.Channel(m.ChannelID); err != nil {
-				fmt.Println("Getting channel, possibly private: " + err.Error())
-				return
-			}
-
-			// If couldn't find channel via API, return.
-			if c.Channel == nil {
-				fmt.Println("Nil channel prevented.")
-				return
-			}
+	// Prevents accessing nil pointers and crashing bot.
+	if c = cfg.Core.GetChannel(m.ChannelID); c == nil {
+		c = &godbot.Channel{}
+		// If c is nil, it is most likely a private channel, grab via API.
+		if c.Channel, err = s.Channel(m.ChannelID); err != nil {
+			fmt.Println("Getting channel, possibly private: " + err.Error())
+			return
 		}
-	} else {
-		fmt.Println("Nil Bot... returning")
-		return
+
+		// If couldn't find channel via API, return.
+		if c.Channel == nil {
+			fmt.Println("Nil channel prevented.")
+			return
+		}
 	}
 
 	if m.Author.Bot {
-		if m.Author.ID == Bot.User.ID {
+		if m.Author.ID == cfg.Core.User.ID {
 			ts, err := m.Timestamp.Parse()
 			// TAG: TODO - fix timestamp
 			if err != nil {
@@ -56,9 +51,7 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 		return
 	} else if c.Type == discordgo.ChannelTypeDM {
 		// Handle private messages.
-		if strings.Contains(m.Content, ",list") {
-			s.ChannelMessageSend(c.ID, channelsTemp())
-		} else if strings.Contains(m.Content, ",help") {
+		if strings.Contains(m.Content, "help") {
 			s.ChannelMessageSend(c.ID, globalHelp())
 		}
 
@@ -74,9 +67,9 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 	}
 
 	// Get the correct guild. Used for Database.
-	if Bot != nil && c.Type != discordgo.ChannelTypeDM {
+	if c.Type != discordgo.ChannelTypeDM {
 		// Get the guild from known guild structures.
-		if g = Bot.GetGuild(c.GuildID); g == nil {
+		if g = cfg.Core.GetGuild(c.GuildID); g == nil {
 			g = &godbot.Guild{}
 			// Guild is not know, pull via API.
 			if g.Guild, err = s.Guild(c.GuildID); err != nil {
@@ -111,6 +104,7 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 	dat := msgToIOdata(m, gConf.Prefix)
 	dat.guild = g
 	dat.guildConfig = gConf
+	dat.session = s
 
 	// Handle the message appropriately if it is a message between alliances.
 	cfg.allianceHandler(m.Message)
@@ -170,26 +164,24 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 	}
 
 	// Required for storing information in the correct database.
-	if Bot != nil {
-		// Prevents accessing nil pointers and crashing bot.
-		if channel = Bot.GetChannel(mu.ChannelID); channel == nil {
-			channel = &godbot.Channel{}
-			// If c is nil, it is most likely a private channel, grab via API.
-			if channel.Channel, err = s.Channel(mu.ChannelID); err != nil {
-				fmt.Println("Getting channel, possibly private: " + err.Error())
-				return
-			}
+	// Prevents accessing nil pointers and crashing bot.
+	if channel = cfg.Core.GetChannel(mu.ChannelID); channel == nil {
+		channel = &godbot.Channel{}
+		// If c is nil, it is most likely a private channel, grab via API.
+		if channel.Channel, err = s.Channel(mu.ChannelID); err != nil {
+			fmt.Println("Getting channel, possibly private: " + err.Error())
+			return
+		}
 
-			// If couldn't find channel via API, return.
-			if channel.Channel == nil {
-				fmt.Println("Nil channel prevented.")
-				return
-			}
+		// If couldn't find channel via API, return.
+		if channel.Channel == nil {
+			fmt.Println("Nil channel prevented.")
+			return
 		}
 
 		if channel.Type != discordgo.ChannelTypeDM {
 			// Get the guild from known guild structures.
-			if guild = Bot.GetGuild(channel.GuildID); guild == nil {
+			if guild = cfg.Core.GetGuild(channel.GuildID); guild == nil {
 				guild = &godbot.Guild{}
 				// Guild is not know, pull via API.
 				if guild.Guild, err = s.Guild(channel.GuildID); err != nil {
@@ -209,10 +201,6 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 			// Account for private messages.
 			database = "private"
 		}
-	} else {
-		// Bot isn't ready (most likely just started), return.
-		fmt.Println("Nil Bot... returning")
-		return
 	}
 
 	var msg Message
@@ -220,8 +208,10 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 
 	// Pull message from database
 	if err = msg.Get(database); err != nil {
-		fmt.Println("Attempting to load message from database: " + err.Error())
-		return
+		if err != mgo.ErrNotFound {
+			fmt.Println("Attempting to load message from database: " + err.Error())
+			return
+		}
 	}
 
 	// Update timestampa

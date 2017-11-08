@@ -1,3 +1,26 @@
+0.8.3 - Additions:
+            - Project renamed from usmbot to SchiNET.
+            - README.md updates!
+            - Set the bot's nickname with ",admin nick [nickname]"
+            - Channel enabling/Disabling moved to ",admin channel [enable/disable]"
+            - RoleCorrection() created to ensure roles are as they should be with correct permissions.
+            - InternalCorrection() verifies the existance of an #internal channel and it has correct permissions.
+            - MemberCorrection() validates all users roles at startup.
+            - ChannelUpdateHandler() will manage the bots channels and make sure permissions remain intact.
+            - ChannelDeleteHandler() will manage the deletion of channels and update the running configuration 
+                while recreating and maintaining our channels.
+            - ",abuse" moved to being a moderator command.
+            - Added "me" alias.
+            - RoleAdd updated to support guild specific roles with identification.
+        Fixes:
+            - "Bot" global removed.
+            - "Dsession" removed from Config struct (redundant with Core)
+            - Role deletion of users that leave the channel.
+            - Ticket modification/deletion by Administrators fixed.
+            - Removed old and unused variables.
+            - Messages reporting not-found fixed.
+
+
 0.8.1 - Fixes:
             - Properly processes newly added guilds that were added while the bot was offline.
             - Prevention of early nil session access.

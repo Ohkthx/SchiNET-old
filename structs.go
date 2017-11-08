@@ -15,9 +15,8 @@ import (
 
 // Config holds information that needs to be readily accessible.
 type Config struct {
-	Core     *godbot.Core
-	DB       *mgo.Session
-	DSession *discordgo.Session
+	Core *godbot.Core
+	DB   *mgo.Session
 
 	// Server Configs
 	GuildConf []*GuildConfig
@@ -39,7 +38,7 @@ type bot struct {
 
 // IOdata is input/output processed.
 type IOdata struct {
-	//err  error // Tracking errors.
+	session   *discordgo.Session
 	cmdPrefix string
 	command   bool // Flag toggling if it is a command or not.
 	rm        bool // Remove initial message.
@@ -61,6 +60,13 @@ type GuildConfig struct {
 	Init   bool
 	Roles  []Role
 	Prefix string // Command prefix. Defaults to: ","
+}
+
+// GuildRole holds all Roles for a specific guild.
+type GuildRole struct {
+	ID    string `bson:"id"`
+	Name  string
+	Roles []string
 }
 
 // Role is a struct containing special roles maintained by the bot.
@@ -109,7 +115,7 @@ type User struct {
 	ID            string `bson:"id"`
 	Username      string
 	Discriminator string
-	Roles         []string
+	GuildRoles    []GuildRole
 	Bot           bool
 	Credits       int
 	CreditsTotal  int

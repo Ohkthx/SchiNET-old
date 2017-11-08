@@ -122,22 +122,6 @@ func Help(f *getopt.Set, prefix, suffix string) string {
 	return "```" + prefix + buf.String() + suffix + "```"
 }
 
-// channelsTemp prints all channels for a particular guild.
-func channelsTemp() string {
-	var msg string
-	msg += "```C\n"
-	for k, c := range Bot.Links {
-		gg := Bot.GetGuild(k)
-		if strings.Contains(gg.Name, "verse") {
-			msg += fmt.Sprintf("Guild: [%s] [%s]\n", gg.Name, gg.ID)
-			for n, cc := range c {
-				msg += fmt.Sprintf("[%2d] Channel: [%16s] [%2d] [%s]\n", n, cc.Name, cc.Type, cc.ID)
-			}
-		}
-	}
-	return msg + "```"
-}
-
 // histograph creates a timeline of message activity within a year.
 func (dat *IOdata) histograph(s *discordgo.Session) error {
 	var snd string
@@ -304,11 +288,11 @@ func (dat *IOdata) ChannelCore() error {
 		return ErrBadPermissions
 	}
 
-	if len(dat.io) < 2 {
+	if len(dat.io) < 3 {
 		return ErrBadArgs
-	} else if dat.io[1] == "enable" {
+	} else if dat.io[2] == "enable" {
 		msg, err = ch.Enable()
-	} else if dat.io[1] == "disable" {
+	} else if dat.io[2] == "disable" {
 		msg, err = ch.Disable()
 	}
 

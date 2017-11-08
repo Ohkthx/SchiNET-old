@@ -20,12 +20,9 @@ type userFlags struct {
 	server     string      // Server for opperation.
 	serverName string      // Name of the server.
 	// Generics
-	User   string // User to perform action on.
-	Type   string // Type of Action.
-	Help   bool   // Command Help
-	List   bool   // List Command objects/items/etc
-	Add    bool
-	Remove bool
+	User string // User to perform action on.
+	Help bool   // Command Help
+	List bool   // List Command objects/items/etc
 
 	// Ban related
 	BotAbuse bool // Bot is being abused.
@@ -99,11 +96,8 @@ func (dat *IOdata) CoreUser() error {
 
 	// Generics
 	fl.FlagLong(&uflags.User, "user", 0, "Username")
-	fl.FlagLong(&uflags.Type, "type", 't', "Type")
 	fl.FlagLong(&uflags.Help, "help", 'h', "This message")
 	fl.FlagLong(&uflags.List, "list", 0, "List all Abusers.")
-	fl.FlagLong(&uflags.Add, "add", 0, "Add")
-	fl.FlagLong(&uflags.Remove, "remove", 0, "Remove")
 
 	// Ban related.
 	fl.FlagLong(&uflags.BotAbuse, "abuse", 0, "Ban a user from the bot.")
@@ -239,7 +233,7 @@ func (u *User) Update() error {
 		"username":     u.Username,
 		"creditstotal": u.CreditsTotal,
 		"credits":      u.Credits,
-		"roles":        u.Roles,
+		"guildroles":   u.GuildRoles,
 		"lastseen":     u.LastSeen,
 	}
 
@@ -377,7 +371,7 @@ func (u *User) BotAbuse(dat *IOdata, cID string, fl userFlags) error {
 		return err
 	}
 
-	if ok := u.HasRoleType(dat.guildConfig, rolePermissionAdmin); !ok {
+	if ok := u.HasRoleType(dat.guildConfig, rolePermissionMod); !ok {
 		return ErrBadPermissions
 	} else if fl.Help {
 		prefix := "**Need** a __username__.\n\n"
@@ -402,12 +396,12 @@ func (u *User) BotAbuse(dat *IOdata, cID string, fl userFlags) error {
 		if roleID == "" {
 			return errors.New("Unable to find role to apply to newly banned used")
 		}
-		if err := Bot.Session.GuildMemberRoleAdd(dat.guildConfig.ID, criminal.ID, roleID); err != nil {
+		if err := dat.session.GuildMemberRoleAdd(dat.guildConfig.ID, criminal.ID, roleID); err != nil {
 			return err
 		}
 
 		// Apply the banned role to the user in memory.
-		criminal.RoleAdd(roleID)
+		criminal.RoleAdd(dat.guild.ID, roleID)
 
 		// Apply the role to the user in the database.
 		if err := criminal.Update(); err != nil {
@@ -453,13 +447,6 @@ func (u *User) Gamble(amount int) (string, error) {
 			"%s remaining in bank: **%d**.",
 			u.StringPretty(), amount, GambleCredits, strings.Title(GambleCredits), twealth)
 
-		bu := UserNew(Bot.User)
-		bu.Get(bu.ID)
-		bu.Credits += amount
-		err = bu.Update()
-		if err != nil {
-			return "", err
-		}
 	} else {
 		twealth += spoils
 		msg = fmt.Sprintf("%s gambled **%d** %s\n"+
@@ -552,9 +539,11 @@ func gambleAlgorithm(l, d, t, credits int) int {
 
 // HasRole will check if a particular user has a role assigned in discord.
 func (u *User) HasRole(roleID string) bool {
-	for _, r := range u.Roles {
-		if r == roleID {
-			return true
+	for _, g := range u.GuildRoles {
+		for _, r := range g.Roles {
+			if r == roleID {
+				return true
+			}
 		}
 	}
 	return false
@@ -580,33 +569,41 @@ func (u *User) RoleAddByType(guildConfig *GuildConfig, base int) error {
 		return ErrBadPermissions
 	}
 
-	u.RoleAdd(roleID)
+	u.RoleAdd(guildConfig.ID, roleID)
 	return nil
 }
 
 // RoleAdd to a user.
-func (u *User) RoleAdd(roleID string) {
-	for _, r := range u.Roles {
-		if r == roleID {
+func (u *User) RoleAdd(guildID, roleID string) {
+	for n, g := range u.GuildRoles {
+		if g.ID == guildID {
+			for _, r := range g.Roles {
+				if r == roleID {
+					return
+				}
+			}
+			// Role was not found. Append it.
+			u.GuildRoles[n].Roles = append(u.GuildRoles[n].Roles, roleID)
 			return
 		}
 	}
-	u.Roles = append(u.Roles, roleID)
 	return
 }
 
 // RoleRemove from a user.
-func (u *User) RoleRemove(roleID string) {
-	for n, r := range u.Roles {
-		if r == roleID {
-			if len(u.Roles) == 1 {
-				u.Roles = nil
+func (u *User) RoleRemove(guildID, roleID string) {
+	for m, g := range u.GuildRoles {
+		for n, r := range g.Roles {
+			if r == roleID {
+				if len(g.Roles) == 1 {
+					g.Roles = nil
+					return
+				}
+				length := len(u.GuildRoles[m].Roles)
+				u.GuildRoles[m].Roles[n] = u.GuildRoles[m].Roles[length-1]
+				u.GuildRoles[m].Roles = u.GuildRoles[m].Roles[:length-1]
 				return
 			}
-
-			u.Roles[n] = u.Roles[len(u.Roles)-1]
-			u.Roles = u.Roles[:len(u.Roles)-1]
-			return
 		}
 	}
 	return

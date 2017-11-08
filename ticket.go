@@ -103,8 +103,10 @@ func (dat *IOdata) CoreTickets() error {
 			return err
 		}
 
-		if t.AddedBy.ID != dat.user.ID || dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin) {
-			return ErrBadPermissions
+		if t.AddedBy.ID != dat.user.ID {
+			if !dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin) {
+				return ErrBadPermissions
+			}
 		}
 
 		if title != "" {
@@ -130,8 +132,15 @@ func (dat *IOdata) CoreTickets() error {
 		if err := t.Get(tID); err != nil {
 			return err
 		}
-		if t.AddedBy.ID != dat.user.ID || dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin) {
-			return ErrBadPermissions
+
+		if t.Open == false {
+			return errors.New("the ticket is already closed/remove")
+		}
+
+		if t.AddedBy.ID != dat.user.ID {
+			if !dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin) {
+				return ErrBadPermissions
+			}
 		}
 		if note == "" {
 			return errors.New("need to specify a note (-n) for closing or removing")

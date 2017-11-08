@@ -16,7 +16,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.8.1"
+	_version       = "0.8.3"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -47,13 +47,13 @@ func init() {
 	cmds["mod"] = make(map[string]string)
 	cmds["normal"] = make(map[string]string)
 
-	cmds["admin"]["permission"] = "Add and Remove permissions for a user."
-	cmds["admin"]["abuse"] = "Add a bot abuser to restrict access."
 	cmds["admin"]["histo"] = "Prints out server message statistics."
+	cmds["admin"]["admin"] = "Allows performing various admin related tasks."
+	cmds["mod"]["ticket"] = "Modify trouble tickets placed by users."
 
+	cmds["mod"]["abuse"] = "Add a bot abuser to restrict access."
 	cmds["mod"]["event"] = "Add/Edit/Remove server events."
 	cmds["mod"]["alias"] = "Add/Remove command aliases."
-	cmds["mod"]["channel"] = "Enable/Disable commands in current channel."
 	cmds["mod"]["clear"] = "Clears messages from current channel. Specify a number."
 	cmds["mod"]["ally"] = "Ally another guild."
 
@@ -68,9 +68,6 @@ func init() {
 	cmds["normal"]["invite"] = "Bot invite information!"
 	cmds["normal"]["ticket"] = "Add a bug to the ticket system!"
 }
-
-// Bot Global interface for pulling discord information.
-var Bot *godbot.Core
 
 // Mgo is for the global database session.
 var Mgo *mgo.Session
@@ -99,40 +96,40 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	// Assign ugly globals
+	// TAG: TODO - fix this by finding an alternative.
+	Mgo = cfg.DB
 
 	// Create a new instance of the bot.
-	bot, err := godbot.New(envToken)
+	cfg.Core, err = godbot.New(envToken)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	cfg.Core = bot
 
 	// Handlers for message changes and additions.
-	bot.MessageCreateHandler(cfg.messageCreateHandler)
-	bot.MessageUpdateHandler(cfg.messageUpdateHandler)
+	cfg.Core.MessageCreateHandler(cfg.messageCreateHandler)
+	cfg.Core.MessageUpdateHandler(cfg.messageUpdateHandler)
 
 	// Handlers for guild changes.
-	bot.GuildCreateHandler(cfg.guildCreateHandler)
-	bot.GuildRoleUpdateHandler(cfg.guildRoleUpdateHandler)
-	bot.GuildRoleDeleteHandler(cfg.guildRoleDeleteHandler)
+	cfg.Core.GuildCreateHandler(cfg.guildCreateHandler)
+	cfg.Core.GuildRoleUpdateHandler(cfg.guildRoleUpdateHandler)
+	cfg.Core.GuildRoleDeleteHandler(cfg.guildRoleDeleteHandler)
 
 	// Handlers for member changes.
-	bot.GuildMemberAddHandler(cfg.guildMemberAddHandler)
-	bot.GuildMemberUpdateHandler(cfg.guildMemberUpdateHandler)
-	bot.GuildMemberRemoveHandler(cfg.guildMemberRemoveHandler)
+	cfg.Core.GuildMemberAddHandler(cfg.guildMemberAddHandler)
+	cfg.Core.GuildMemberUpdateHandler(cfg.guildMemberUpdateHandler)
+	cfg.Core.GuildMemberRemoveHandler(cfg.guildMemberRemoveHandler)
+
+	// Handlers for channels.
+	cfg.Core.ChannelUpdateHandler(cfg.channelUpdateHandler)
+	cfg.Core.ChannelDeleteHandler(cfg.channelDeleteHandler)
 
 	// Start the bot
-	err = bot.Start()
-	if err != nil {
+	if err = cfg.Core.Start(); err != nil {
 		fmt.Println(err)
+		return
 	}
-
-	// Assign ugly globals
-	// TAG: TODO - fix this by finding an alternative.
-	Bot = bot
-	Mgo = cfg.DB
-	cfg.DSession = bot.Session
 
 	// Process the default bot command aliases.
 	if err := cfg.defaultAliases(); err != nil {
@@ -150,6 +147,29 @@ func main() {
 	if err = cfg.GuildConfigLoad(); err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	// Process all guild configurations and verify...
+	for _, g := range cfg.GuildConf {
+		// ... verify roles are still correct.
+		if err = g.RoleCorrection(cfg.Core.Session); err != nil {
+			fmt.Println("Role Correction: " + err.Error())
+		}
+
+		// ... verify internal channel is still correct.
+		if err = cfg.InternalCorrection(g.ID); err != nil {
+			fmt.Println("Internal Correction: " + err.Error())
+		}
+
+		// Update guild... even in failure (failed shouldn't be saved).
+		if err = g.Update(); err != nil {
+			fmt.Println("Role Correction, updating: " + err.Error())
+		}
+	}
+
+	// Member Roles update in Database:
+	if err = cfg.MemberCorrection(); err != nil {
+		fmt.Println("Member Correction: " + err.Error())
 	}
 
 	// Run in either silent mode with no output (for background) or with interactive console.
@@ -213,10 +233,11 @@ func (cfg *Config) defaultAliases() error {
 		linked string
 	}
 
-	var aliases [3]aliasSimple
+	var aliases [4]aliasSimple
 	aliases[0] = aliasSimple{"gamble", "user --gamble -n"}
 	aliases[1] = aliasSimple{"abuse", "user --abuse --user"}
 	aliases[2] = aliasSimple{"xfer", "user --xfer"}
+	aliases[3] = aliasSimple{"me", "user"}
 
 	for _, a := range aliases {
 		user := UserNew(cfg.Core.User)

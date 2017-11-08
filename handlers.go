@@ -13,12 +13,12 @@ import (
 // guildCreateHandler Handles newly added guilds that have invited the bot to the server.
 func (conf *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.GuildCreate) {
 	// If the gloabl is nil (not ready yet), return.
-	if Bot == nil {
+	if conf.Core == nil {
 		return
 	}
 
 	// Tell the bot core to update all connections.
-	if err := Bot.UpdateConnections(); err != nil {
+	if err := conf.Core.UpdateConnections(); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -43,8 +43,16 @@ func (conf *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.Guild
 		if guildConfig == nil {
 			printDebug("Guild is nil?!")
 		}
+
+		// Create the guild roles.
 		if err = conf.createGuildRoles(guildConfig, ng.ID); err != nil {
-			fmt.Println(err)
+			fmt.Println("Creating roles: " + err.Error())
+			return
+		}
+
+		// Create the internal channel.
+		if err = conf.InternalCorrection(guildConfig.ID); err != nil {
+			fmt.Println("Creating internal: " + err.Error())
 			return
 		}
 
@@ -71,7 +79,7 @@ func (conf *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.Guild
 		}
 
 		// Grant Admin permissions to server Owner.
-		admin.RoleAdd(roleID)
+		admin.RoleAdd(ng.ID, roleID)
 
 		// Add the role to the admin in the database.
 		if err = admin.Update(); err != nil {
@@ -195,24 +203,22 @@ func (conf *Config) guildRoleDeleteHandler(s *discordgo.Session, rd *discordgo.G
 
 // guildMemberAddHandler greets a new palyers to the channel.
 func (conf *Config) guildMemberAddHandler(s *discordgo.Session, nu *discordgo.GuildMemberAdd) {
-	if Bot != nil {
-		c := Bot.GetMainChannel(nu.GuildID)
-		msg := fmt.Sprintf("Welcome to the server, __**%s**#%s__!", nu.User.Username, nu.User.Discriminator)
-		s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
+	c := conf.Core.GetMainChannel(nu.GuildID)
+	msg := fmt.Sprintf("Welcome to the server, __**%s**#%s__!", nu.User.Username, nu.User.Discriminator)
+	s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorBlue))
 
-		tn := time.Now()
-		// Add the new user to the database.
-		if err := UserUpdateSimple(nu.GuildID, nu.User, 0, tn); err != nil {
-			fmt.Println("Adding new user to database: " + err.Error())
-		}
+	tn := time.Now()
+	// Add the new user to the database.
+	if err := UserUpdateSimple(nu.GuildID, nu.User, 0, tn); err != nil {
+		fmt.Println("Adding new user to database: " + err.Error())
+	}
 
-		for _, ch := range Bot.Channels {
-			if ch.Name == "internal" && ch.GuildID == nu.GuildID {
-				msg := fmt.Sprintf("__**%s**#%s__ [ID: %s] joined the server @ %s\n",
-					nu.User.Username, nu.User.Discriminator, nu.User.ID, tn.Format(time.UnixDate))
-				s.ChannelMessageSendEmbed(ch.ID, embedCreator(msg, ColorGreen))
-				return
-			}
+	for _, ch := range conf.Core.Channels {
+		if ch.Name == "internal" && ch.GuildID == nu.GuildID {
+			msg := fmt.Sprintf("__**%s**#%s__ [ID: %s] joined the server @ %s\n",
+				nu.User.Username, nu.User.Discriminator, nu.User.ID, tn.Format(time.UnixDate))
+			s.ChannelMessageSendEmbed(ch.ID, embedCreator(msg, ColorGreen))
+			return
 		}
 	}
 }
@@ -228,7 +234,18 @@ func (conf *Config) guildMemberUpdateHandler(s *discordgo.Session, uu *discordgo
 		}
 	}
 
-	user.Roles = uu.Roles
+	var updated bool
+	for n, g := range user.GuildRoles {
+		if g.ID == uu.GuildID {
+			updated = true
+			user.GuildRoles[n].Roles = uu.Roles
+		}
+	}
+
+	if !updated {
+		user.GuildRoles = append(user.GuildRoles, GuildRole{ID: uu.GuildID, Name: "", Roles: uu.Roles})
+	}
+
 	if err := user.Update(); err != nil {
 		fmt.Println(err)
 		return
@@ -239,24 +256,69 @@ func (conf *Config) guildMemberUpdateHandler(s *discordgo.Session, uu *discordgo
 
 // guildMemberRemoveHandler notifies of a leaving user (NOT CURRENTLY WORKING)
 func (conf *Config) guildMemberRemoveHandler(s *discordgo.Session, du *discordgo.GuildMemberRemove) {
-	if Bot != nil {
-		for _, c := range Bot.Channels {
-			if c.Name == "internal" && c.GuildID == du.GuildID {
-				tn := time.Now()
-				msg := fmt.Sprintf("__**%s**#%s__ [ID: %s] left the server @ %s\n",
-					du.User.Username, du.User.Discriminator, du.User.ID, tn.Format(time.UnixDate))
-				s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorMaroon))
-				return
-			}
-		}
-
-		user := UserNew(du.User)
-		user.Roles = nil
-		if err := user.Update(); err != nil {
-			fmt.Println("User left, removing roles: " + err.Error())
+	for _, c := range conf.Core.Channels {
+		if c.Name == "internal" && c.GuildID == du.GuildID {
+			tn := time.Now()
+			msg := fmt.Sprintf("__**%s**#%s__ [ID: %s] left the server @ %s\n",
+				du.User.Username, du.User.Discriminator, du.User.ID, tn.Format(time.UnixDate))
+			s.ChannelMessageSendEmbed(c.ID, embedCreator(msg, ColorMaroon))
 			return
 		}
 	}
+
+	user := UserNew(du.User)
+
+	for n, g := range user.GuildRoles {
+		if g.ID == du.GuildID {
+			if len(user.GuildRoles) == 1 {
+				user.GuildRoles = user.GuildRoles[:0]
+			} else {
+				user.GuildRoles[n] = user.GuildRoles[len(user.GuildRoles)-1]
+				user.GuildRoles = user.GuildRoles[:len(user.GuildRoles)-1]
+			}
+			break
+		}
+	}
+
+	if err := user.Update(); err != nil {
+		fmt.Println("User left, removing roles: " + err.Error())
+		return
+	}
+}
+
+// channelUpdateHandler will process existing channels that have been updated.
+func (conf *Config) channelUpdateHandler(s *discordgo.Session, cu *discordgo.ChannelUpdate) {
+	// If it's not the internal channel, we don't care.
+	if cu.Name != "internal" {
+		return
+	}
+
+	if err := conf.InternalCorrection(cu.GuildID); err != nil {
+		fmt.Println("Internal Correction on updated channel: " + err.Error())
+		return
+	}
+
+	return
+}
+
+// channelDeleteHandler will process the deletion of channels.
+func (conf *Config) channelDeleteHandler(s *discordgo.Session, cd *discordgo.ChannelDelete) {
+	core := conf.Core
+
+	// Remove it from out channels.
+	core.ChannelMemoryDelete(cd.Channel)
+
+	// If it's not the internal channel, we don't care.
+	if cd.Name != "internal" {
+		return
+	}
+
+	if err := conf.InternalCorrection(cd.GuildID); err != nil {
+		fmt.Println("Internal Correction on updated channel: " + err.Error())
+		return
+	}
+
+	return
 }
 
 // watchLogHandler tracks if the message is under WatchLog.

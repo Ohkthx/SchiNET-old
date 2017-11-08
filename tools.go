@@ -129,10 +129,10 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 	}
 
 	// Make sure the channel is allowed to have bot commmands.
-	if dat.io[0] != "channel" {
+	if !strings.Contains(dat.input, "admin channel") {
 		ch := ChannelNew(dat.msg.ChannelID, dat.guild.Name)
 		// TAG: TODO - Add support for having EITHER Administrator or Moderator.
-		if !dat.user.HasRoleType(dat.guildConfig, rolePermissionMod) && !ch.Check() {
+		if (!dat.user.HasRoleType(dat.guildConfig, rolePermissionMod) && !dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin)) && !ch.Check() {
 			dat.msgEmbed = embedCreator("Bot commands have been disabled here.", ColorGray)
 			return nil
 		}
@@ -172,8 +172,6 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 		return dat.CoreAlias()
 	case "histo":
 		return dat.histograph(cfg.Core.Session)
-	case "channel":
-		return dat.ChannelCore()
 	case "event", "events":
 		return dat.CoreEvent()
 	case "ticket", "tickets":
@@ -183,9 +181,9 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 	case "script", "scripts":
 		return dat.CoreLibrary()
 	case "clear", "delete":
-		return dat.messageClear(cfg.DSession, "fast")
+		return dat.messageClear(cfg.Core.Session, "fast")
 	case "clear-slow":
-		return dat.messageClear(cfg.DSession, "slow")
+		return dat.messageClear(cfg.Core.Session, "slow")
 	case "admin":
 		return cfg.CoreAdmin(dat)
 	case "echo":
@@ -330,7 +328,7 @@ func botInvite() string {
 
 // globalHelp prints vairous helps.
 func globalHelp() string {
-	var msg = "*Most commands have a '--help' ability."
+	var msg = "*Most commands have a '--help' or 'help' ability if typed after base command."
 	for t, cmd := range cmds {
 		msg += fmt.Sprintf("\n\n[ %s ]", t)
 		for c, txt := range cmd {
