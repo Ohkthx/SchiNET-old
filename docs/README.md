@@ -8,7 +8,7 @@ Curious how to perform some commands? Check out the guides linked in the **Table
 
 | Access Type | Guide  |
 | ------ | ------ |
-|------------- | [docs/Main.md (This Page)][MainDoc] |
+|------------- | [docs/README.md][MainDoc] |
 | Admin | [docs/Admin.md][AdminDoc] |
 | Moderator | [docs/Moderator.md][ModeratorDoc] |
 | User | [docs/User.md][UserDoc] |
@@ -42,7 +42,7 @@ MIT
 [//]: # (These are reference links used in the body of this note and get stripped out when the markdown processor does its job. There is no need to format nicely because it shouldn't be seen. Thanks SO - http://stackoverflow.com/questions/4823468/store-comments-in-markdown-syntax)
 [//]: # (Guide Links:)
 [Home]: <https://github.com/d0x1p2/SchiNET/>
-[MainDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md>
+[MainDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/README.md>
 [AdminDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Admin.md>
 [ModeratorDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Moderator.md>
 [UserDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md>
@@ -54,4 +54,4 @@ MIT
 [godbot]: <https://github.com/d0x1p2/godbot>
 [original]: <https://github.com/d0x1p2/DiscordBot-go>
 [//]: # (Other Links:)
-[discord_server]: <https://https://discord.gg/GpHDxx6>
+[discord_server]: <https://discord.gg/GpHDxx6>

@@ -527,11 +527,16 @@ func (conf *Config) MemberCorrection() error {
 
 			// Replace or append the new roles.
 			if len(user.GuildRoles) > 0 {
+				var exists bool
 				for n, gr := range user.GuildRoles {
 					if gr.ID == g.ID {
 						user.GuildRoles[n] = GuildRole{ID: g.ID, Name: g.Name, Roles: u.Roles}
+						exists = true
 						break
 					}
+				}
+				if !exists {
+					user.GuildRoles = append(user.GuildRoles, GuildRole{ID: g.ID, Name: g.Name, Roles: u.Roles})
 				}
 			} else {
 				user.GuildRoles = append(user.GuildRoles, GuildRole{ID: g.ID, Name: g.Name, Roles: u.Roles})

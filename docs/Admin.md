@@ -8,7 +8,7 @@ This section is dedicated to the use of administrator commands. If you have any 
 ---
 | Access Type | Guide  |
 | ------ | ------ |
-|------------- | [docs/Main.md][MainDoc] |
+|------------- | [docs/README.md][MainDoc] |
 | Admin | [docs/Admin.md][AdminDoc] |
 | Moderator | [docs/Moderator.md][ModeratorDoc] |
 | User | [docs/User.md][UserDoc] |
@@ -85,11 +85,11 @@ SchiNET's source is available at the [Main][Home] page!
 
 [//]: # (Guide Links:)
 [Home]: <https://github.com/d0x1p2/SchiNET/>
-[MainDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md>
+[MainDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/README.md>
 [AdminDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Admin.md>
 [ModeratorDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/Moderator.md>
 [UserDoc]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md>
-[UserScripts]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md#Script>
-[UserTickets]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md#Ticket>
+[UserScripts]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md#script>
+[UserTickets]: <https://github.com/d0x1p2/SchiNET/blob/master/docs/User.md#ticket>
 [//]: # (Other Links:)
-[discord_server]: <https://https://discord.gg/GpHDxx6>
+[discord_server]: <https://discord.gg/GpHDxx6>

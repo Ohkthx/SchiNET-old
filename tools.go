@@ -338,8 +338,7 @@ func globalHelp() string {
 
 	var msg2 string
 	msg2 += "\n\nThe easy-to-use Documentation can be found at: "
-	msg2 += "https://github.com/d0x1p2/SchiNET/blob/master/docs/Main.md"
-	return "```" + msg + "```" + msg2
+	return "```" + msg + "```" + msg2 + helpDocs
 }
 
 // msgSize is a small function intended to gauge a rough size of what a discord message is.

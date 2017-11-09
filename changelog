@@ -1,3 +1,9 @@
+0.8.5 - Additions:
+            - Global variable for our Documentation.
+        Fixes:
+            - Updating of Guild Roles when Guild isn't already added.
+            - Documentation modifications and fixes.
+
 0.8.4 - Additions:
             - Documentation link added to README.md and 'help' via PM/DM
         Fixes:

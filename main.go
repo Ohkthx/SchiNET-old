@@ -16,7 +16,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.8.4"
+	_version       = "0.8.5"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -28,6 +28,7 @@ var (
 	consoleDisable bool
 	watcherEnabled bool
 	DEBUG          bool
+	helpDocs       = "https://github.com/d0x1p2/SchiNET/blob/master/docs/README.md"
 	watcherPort    string
 	watcherHost    string
 	cmds           map[string]map[string]string
@@ -233,11 +234,12 @@ func (cfg *Config) defaultAliases() error {
 		linked string
 	}
 
-	var aliases [4]aliasSimple
+	var aliases [5]aliasSimple
 	aliases[0] = aliasSimple{"gamble", "user --gamble -n"}
 	aliases[1] = aliasSimple{"abuse", "user --abuse --user"}
 	aliases[2] = aliasSimple{"xfer", "user --xfer"}
 	aliases[3] = aliasSimple{"me", "user"}
+	aliases[4] = aliasSimple{"beep", "echo Beep Boop..."}
 
 	for _, a := range aliases {
 		user := UserNew(cfg.Core.User)
@@ -257,8 +259,8 @@ func (cfg *Config) dmAdmin(s *discordgo.Session, uID, server string) error {
 		"To invoke commands, they must be entered on a server channel.\n"+
 		"An example of how to display basic user information:\n"+
 		"`,user`\n\n"+
-		"If you have additional questions, you can always use the `,help` command or join us at %s",
-		uID, server, envBotGuild)
+		"If you have additional questions, you can:\n+ Use the `,help` command\n+ Join us at %s\n+ Read the Easy-To-Use Documentation: %s",
+		uID, server, envBotGuild, helpDocs)
 
 	// Create the DM channel
 	var channel *discordgo.Channel
