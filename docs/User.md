@@ -89,7 +89,8 @@ Explaination of the various flags:
 | -t | --title | Title of the Script to Add/Edit/Remove/Request. |
 | -v | --version | Add a version to a script while adding/editing.
 | -l | --list | List all scripts that currently exist in the database. |
-| -h | --help | Displays help information similar to this.
+| -h | --help | Displays help information similar to this. |
+| -i | --id | Use an ID instead of a username + title |
 
 Examples:
 
@@ -101,6 +102,7 @@ Examples:
 | script --add -v 2.1 -t "Tester" *[attached .txt file]* | Creates a script named "Tester" with the version of 2.1 |
 | script --list | List all available scripts in the library. |
 | script --get -t "Tester" --user d0x1p2 | Gets a script called "Tester" that was uploaded by "d0x1p2"
+| script --get --id 12 | Retrieves a script based on it's ID. |
 
 ### Ticket
 

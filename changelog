@@ -1,3 +1,15 @@
+0.8.6 - Additions:
+            - Scripts can be retieved using their ID from [script --list].
+            - Spawning console commands into other windows to process.
+            - Updated response to "help" via DM.
+            - Document skipping support in MongoDB added.
+        Fixes:
+            - Removed old references to projects prior name.
+            - Proper permissions for manipulating events.
+            - @everyone stripped on echo.
+            - README.md in root directory properly linking to documentation.
+            - Bot Invite link is now correct.
+
 0.8.5 - Additions:
             - Global variable for our Documentation.
         Fixes:

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"unicode"
@@ -187,7 +189,7 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 	case "admin":
 		return cfg.CoreAdmin(dat)
 	case "echo":
-		dat.output = strings.Join(dat.io[1:], " ")
+		dat.output = echoMsg(dat.io[1:])
 		return nil
 	}
 	return nil
@@ -320,7 +322,7 @@ func botInvite() string {
 		"Invite me to your server!\n"+
 			"Click to Add-> %s\n\n"+
 			"Bot Support Server -> %s\n",
-		"https://discordapp.com/oauth2/authorize?client_id=290843164892463104&scope=bot&permissions=469855422",
+		"https://discordapp.com/oauth2/authorize?client_id=375083817565945867&scope=bot&permissions=469855422",
 		envBotGuild,
 	)
 	return msg
@@ -388,5 +390,15 @@ func msgSize(m *discordgo.Message) string {
 func printDebug(msg string) {
 	if DEBUG {
 		fmt.Println("DEBUG: " + msg)
+	}
+}
+
+// newPause just waits for the enter key to be pressed.
+func newPause() {
+	buf := bufio.NewReader(os.Stdin)
+	fmt.Print("Press [enter] to continue... ")
+	_, err := buf.ReadBytes('\n')
+	if err != nil {
+		fmt.Println(err)
 	}
 }

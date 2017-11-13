@@ -16,7 +16,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.8.5"
+	_version       = "0.8.6"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -24,13 +24,13 @@ var (
 	envPBPW        = os.Getenv("BOT_PBPW")
 	envPB          = os.Getenv("BOT_PB")
 	envBotGuild    = os.Getenv("BOT_GUILD")
-	envDebug       bool
-	consoleDisable bool
-	watcherEnabled bool
-	DEBUG          bool
 	helpDocs       = "https://github.com/d0x1p2/SchiNET/blob/master/docs/README.md"
-	watcherPort    string
-	watcherHost    string
+	consoleDisable bool   // Argument to run in background or to run as a console.
+	DEBUG          bool   // Argument as to if this is a DEBUGGED session.
+	watcherEnabled bool   // Argument for WatchLog being enabled or disabled.
+	watcherPort    string // Argument for WatchLog Port.
+	watcherHost    string // Argument for WatachLog Host.
+	execute        string // Argument for Execute a command in a new window.
 	cmds           map[string]map[string]string
 )
 
@@ -40,6 +40,7 @@ func init() {
 	flag.BoolVar(&DEBUG, "debug", false, "Debugging turned on.")
 	flag.StringVar(&watcherPort, "port", "", "Port to connect on for watcher.")
 	flag.StringVar(&watcherHost, "host", "", "Host to the watcher.")
+	flag.StringVar(&execute, "exec", "", "Execute a console command and exit.")
 	flag.Parse()
 
 	// Init commands.
@@ -106,6 +107,16 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	if execute != "" {
+		cfg.Core.LiteMode = true
+		if err = cfg.Core.Start(); err != nil {
+			fmt.Println(err)
+			newPause()
+			return
+		}
+		cfg.OneTimeExec(execute)
 	}
 
 	// Handlers for message changes and additions.

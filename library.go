@@ -19,7 +19,7 @@ import (
 
 // Error constants for script library.
 var (
-	ErrScriptNotFound = errors.New("script appears to not be in database, check username and script name")
+	ErrScriptNotFound = errors.New("script appears to not be in database, check username, script name, or ID")
 	//ErrBadUsername    = fmt.Errorf("bad user name supplied\n%s", scriptReqSyntax)
 	//ErrBadScript      = fmt.Errorf("bad script name supplied\n%s", scriptReqSyntax)
 	//ErrBadArgs        = errors.New("bad arguments supplied")
@@ -48,6 +48,7 @@ const (
 type Library struct {
 	Database    string // Database to store information on.
 	Attachments []*discordgo.MessageAttachment
+	Location    int
 	Flags       *getopt.Set
 	Script      *Script
 }
@@ -74,6 +75,7 @@ func (dat *IOdata) CoreLibrary() error {
 	var add, edit, remove, get, list, help bool
 	var version float32
 	var user, name string
+	var id = -1
 
 	lib := LibraryNew(dat.guild.Name, dat.msg.Attachments)
 
@@ -85,6 +87,7 @@ func (dat *IOdata) CoreLibrary() error {
 	fl.FlagLong(&get, "get", 'g', "Get a script")
 	fl.FlagLong(&user, "user", 0, "Script Owner")
 	fl.FlagLong(&name, "title", 't', "Title of script")
+	fl.FlagLong(&id, "id", 'i', "ID of the script.")
 	fl.FlagLong(&version, "version", 'v', "Versioning")
 	fl.FlagLong(&list, "list", 'l', "List all script in Library")
 	fl.FlagLong(&help, "help", 'h', "Help")
@@ -99,6 +102,7 @@ func (dat *IOdata) CoreLibrary() error {
 	}
 
 	lib.Script = ScriptNew(name, "", version, dat.user.Basic())
+	lib.Location = id
 
 	if (add || edit) && name != "" {
 		msg, err = lib.Add()
@@ -112,7 +116,7 @@ func (dat *IOdata) CoreLibrary() error {
 			lib.Script.Author.Name = user
 		}
 		msg, err = lib.Delete()
-	} else if get && name != "" && user != "" {
+	} else if get && ((name != "" && user != "") || id >= 0) {
 		lib.Script.Author.Name = user
 		msg, err = lib.Get()
 	} else if list {
@@ -270,15 +274,31 @@ func (lib *Library) find(requested bool) (*Script, error) {
 	s := lib.Script
 	var q = make(map[string]interface{})
 
-	q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
+	if lib.Location < 0 {
+		q["$and"] = []bson.M{bson.M{"name": s.Name}, bson.M{"author.name": s.Author.Name}}
+	} else {
+		q = nil
+	}
 
 	dbdat := DBdataCreate(lib.Database, CollectionScripts, Script{}, q, nil)
-	err := dbdat.dbGet(Script{})
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			return nil, ErrScriptNotFound
+
+	var err error
+	if lib.Location < 0 {
+		err = dbdat.dbGet(Script{})
+		if err != nil {
+			if err == mgo.ErrNotFound {
+				return nil, ErrScriptNotFound
+			}
+			return nil, err
 		}
-		return nil, err
+	} else {
+		err = dbdat.dbGetWithSkip(Script{}, lib.Location)
+		if err != nil {
+			if err == mgo.ErrNotFound {
+				return nil, ErrScriptNotFound
+			}
+			return nil, err
+		}
 	}
 
 	var script Script

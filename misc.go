@@ -115,7 +115,6 @@ func pasteIt(msg, title string) (string, error) {
 
 // Help prints various command assistance.
 func Help(f *getopt.Set, prefix, suffix string) string {
-
 	var buf = new(bytes.Buffer)
 	f.PrintUsage(buf)
 
@@ -412,4 +411,17 @@ func (ch *ChannelInfo) Update() error {
 	}
 
 	return nil
+}
+
+func echoMsg(msg []string) string {
+	var output string
+	for _, w := range msg {
+		switch w {
+		case "@everyone":
+			output += "everyone "
+		default:
+			output += w + " "
+		}
+	}
+	return output
 }

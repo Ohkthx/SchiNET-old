@@ -163,6 +163,31 @@ func (dat *DBdata) dbGet(i interface{}) error {
 	return nil
 }
 
+func (dat *DBdata) dbGetWithSkip(i interface{}, amount int) error {
+	var unk interface{}
+	var err error
+
+	mdb := dat.Handler
+
+	c := mdb.DB(dat.Database).C(dat.Collection)
+	err = c.Find(dat.Query).Skip(amount).One(&unk)
+	if err != nil {
+		return err
+	}
+
+	if unk == nil {
+		return mgo.ErrNotFound
+	}
+
+	dat.Document, err = handlerForInterface(i, unk)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
 func (dat *DBdata) dbGetWithLimit(i interface{}, sort []string, amount int) error {
 	var unk []interface{}
 	var err error

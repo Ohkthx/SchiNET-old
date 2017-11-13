@@ -60,6 +60,11 @@ func (con *console) Parser() error {
 
 	var ErrNotEnough = errors.New("Not enough commands")
 	switch strings.ToLower(con.input[0]) {
+	case "spawn":
+		if !multi {
+			return ErrNotEnough
+		}
+		return con.Spawner(con.input[1:])
 	// Check archives a Guild's(Server) messages into local database.
 	case "check":
 		if !multi {
@@ -89,6 +94,40 @@ func (con *console) Parser() error {
 	}
 
 	return nil
+}
+
+// Spawner launches a new command prompt to perform the command in.
+func (con *console) Spawner(input []string) error {
+	// Launch a new window (WINDOWS SPECIFIC- NEED CHANGING.)
+	// TAG: TODO - *nix compatible.
+	cmd := exec.Command("cmd", "/C", "start", "SchiNET.exe", "-exec", "\""+strings.Join(input, " ")+"\"")
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// OneTimeExec a series of commands then promptly exit.
+func (cfg *Config) OneTimeExec(input string) {
+	var err error
+	cmdPrefix := envCMDPrefix
+
+	_, s := strToCommands(input, cmdPrefix)
+	iodat := sliceToIOdata(cfg.Core, s, cmdPrefix)
+
+	if len(iodat.io) > 0 {
+		con := console{config: cfg, input: iodat.io}
+		if err = con.Parser(); err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	newPause()
+
+	// Cleanup here from "exit"
+	cfg.cleanup()
 }
 
 // channelCheck archives a particular guild's messages into a local database.
@@ -298,7 +337,7 @@ func (con *console) watchServer(watch WatchLog, serverStarted chan string, amoun
 
 	// Launch a new window (WINDOWS SPECIFIC- NEED CHANGING.)
 	// TAG: TODO - *nix compatible.
-	cmd := exec.Command("cmd", "/C", "start", "usmbot.exe", "-watcher", "-host", hostS, "-port", portS)
+	cmd := exec.Command("cmd", "/C", "start", "SchiNET.exe", "-watcher", "-host", hostS, "-port", portS)
 	if err := cmd.Start(); err != nil {
 		fmt.Println(err)
 		return

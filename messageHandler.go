@@ -52,7 +52,8 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 	} else if c.Type == discordgo.ChannelTypeDM {
 		// Handle private messages.
 		if strings.Contains(m.Content, "help") {
-			s.ChannelMessageSend(c.ID, globalHelp())
+			helptxt := fmt.Sprintf("Join us at: %s\n\nCheck out the Documentation at:\n%s\n", envBotGuild, helpDocs)
+			s.ChannelMessageSendEmbed(c.ID, embedCreator(helptxt, ColorGray))
 		}
 
 		// Log message into Database
@@ -178,29 +179,29 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 			fmt.Println("Nil channel prevented.")
 			return
 		}
+	}
 
-		if channel.Type != discordgo.ChannelTypeDM {
-			// Get the guild from known guild structures.
-			if guild = cfg.Core.GetGuild(channel.GuildID); guild == nil {
-				guild = &godbot.Guild{}
-				// Guild is not know, pull via API.
-				if guild.Guild, err = s.Guild(channel.GuildID); err != nil {
-					fmt.Println("Getting guild, possibly private: " + err.Error())
-					return
-				}
-
-				// Guild is still nil, even from API- return.
-				if guild.Guild == nil {
-					fmt.Println("Nil guild prevented.")
-					return
-				}
+	if channel.Type != discordgo.ChannelTypeDM {
+		// Get the guild from known guild structures.
+		if guild = cfg.Core.GetGuild(channel.GuildID); guild == nil {
+			guild = &godbot.Guild{}
+			// Guild is not know, pull via API.
+			if guild.Guild, err = s.Guild(channel.GuildID); err != nil {
+				fmt.Println("Getting guild, possibly private: " + err.Error())
+				return
 			}
 
-			database = guild.Name
-		} else {
-			// Account for private messages.
-			database = "private"
+			// Guild is still nil, even from API- return.
+			if guild.Guild == nil {
+				fmt.Println("Nil guild prevented.")
+				return
+			}
 		}
+
+		database = guild.Name
+	} else {
+		// Account for private messages.
+		database = "private"
 	}
 
 	var msg Message
