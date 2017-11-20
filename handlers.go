@@ -17,15 +17,9 @@ func (conf *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.Guild
 		return
 	}
 
+	var err error
 	// Tell the bot core to update all connections.
 	if err := conf.Core.UpdateConnections(); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// Get the guild owner.
-	user, err := s.GuildMember(ng.Guild.ID, ng.OwnerID)
-	if err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -53,6 +47,14 @@ func (conf *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.Guild
 		// Create the internal channel.
 		if err = conf.InternalCorrection(guildConfig.ID); err != nil {
 			fmt.Println("Creating internal: " + err.Error())
+			return
+		}
+
+		// Get the guild owner.
+		var user *discordgo.Member
+		user, err = s.GuildMember(ng.Guild.ID, ng.OwnerID)
+		if err != nil {
+			fmt.Println(err)
 			return
 		}
 

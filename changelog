@@ -1,3 +1,7 @@
+0.8.7 - Fixes:
+            - Properly updating GuildConfig when a role is found but not already existant.
+            - Moved an Discord API call so it isn't fired as often.
+
 0.8.6 - Additions:
             - Scripts can be retieved using their ID from [script --list].
             - Spawning console commands into other windows to process.

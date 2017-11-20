@@ -143,6 +143,10 @@ func (conf *Config) createGuildRoles(guildConfig *GuildConfig, guildID string) e
 						return err
 					}
 				}
+				// Assign the role to the guild's configuration.
+				if guildConfig != nil {
+					guildConfig.RoleAdd(r.ID, "", roleName, r.Permissions|roleValue, roleValue)
+				}
 				break
 			}
 		}
