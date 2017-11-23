@@ -132,7 +132,7 @@ func (dat *IOdata) histograph(s *discordgo.Session) error {
 	}
 
 	// Get ALL messages from Database
-	data := DBdataCreate(dat.guild.Name, CollectionMessages, Message{}, nil, nil)
+	data := DBdataCreate(dat.guild.ID, CollectionMessages, Message{}, nil, nil)
 	if err := data.dbGetAll(Message{}); err != nil {
 		return err
 	}
@@ -269,10 +269,10 @@ func monToString(i int) string {
 }
 
 // ChannelNew creates a new channel object.
-func ChannelNew(cID, gName string) *ChannelInfo {
+func ChannelNew(cID, gID string) *ChannelInfo {
 	return &ChannelInfo{
 		ID:     cID,
-		Server: gName,
+		Server: gID,
 	}
 }
 
@@ -280,7 +280,7 @@ func ChannelNew(cID, gName string) *ChannelInfo {
 func (dat *IOdata) ChannelCore() error {
 	var err error
 	var msg string
-	var ch = ChannelNew(dat.msg.ChannelID, dat.guild.Name)
+	var ch = ChannelNew(dat.msg.ChannelID, dat.guild.ID)
 
 	// Return if the user does not have the role
 	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionAdmin); !ok {

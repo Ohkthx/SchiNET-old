@@ -44,7 +44,7 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 			if err != nil {
 				fmt.Println(err)
 			}
-			if err := UserUpdateSimple(c.GuildID, m.Author, 1, ts); err != nil {
+			if err := UserUpdateSimple(m.Author, 1, ts); err != nil {
 				return
 			}
 		}
@@ -198,7 +198,7 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 			}
 		}
 
-		database = guild.Name
+		database = guild.ID
 	} else {
 		// Account for private messages.
 		database = "private"
@@ -250,8 +250,8 @@ func (cfg *Config) messageUpdateHandler(s *discordgo.Session, mu *discordgo.Mess
 // messageLogger logs the supplied message into a local database.
 func messageLogger(database, databaseID, channel string, msg *discordgo.Message) (bool, error) {
 
-	m := MessageNew(databaseID, channel, msg)
-	if ok, err := m.Update(database); err != nil {
+	m := MessageNew(channel, msg)
+	if ok, err := m.Update(databaseID); err != nil {
 		return false, err
 	} else if ok {
 		ts, err := msg.Timestamp.Parse()
@@ -259,7 +259,7 @@ func messageLogger(database, databaseID, channel string, msg *discordgo.Message)
 		if err != nil {
 			fmt.Println("messageLog():" + err.Error())
 		}
-		if err := UserUpdateSimple(databaseID, msg.Author, 1, ts); err != nil {
+		if err := UserUpdateSimple(msg.Author, 1, ts); err != nil {
 			fmt.Println("updating/adding user", err)
 		}
 		return true, nil
@@ -340,7 +340,7 @@ func (cfg *Config) messageIntegrityCheck(gName string) (string, error) {
 }
 
 // MessageNew returns a new message object.
-func MessageNew(databaseID, channelName string, m *discordgo.Message) *Message {
+func MessageNew(channelName string, m *discordgo.Message) *Message {
 	u := UserNew(m.Author)
 
 	var ts, ets time.Time

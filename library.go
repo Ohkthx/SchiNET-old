@@ -77,7 +77,7 @@ func (dat *IOdata) CoreLibrary() error {
 	var user, name string
 	var id = -1
 
-	lib := LibraryNew(dat.guild.Name, dat.msg.Attachments)
+	lib := LibraryNew(dat.guild.ID, dat.msg.Attachments)
 
 	fl := getopt.New()
 

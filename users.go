@@ -186,7 +186,7 @@ func UserNew(u *discordgo.User) *User {
 }
 
 // UserUpdateSimple stream-lines the process for incrementing credits.
-func UserUpdateSimple(serverID string, user *discordgo.User, inc int, ts time.Time) error {
+func UserUpdateSimple(user *discordgo.User, inc int, ts time.Time) error {
 	u := UserNew(user)
 
 	if err := u.Get(u.ID); err != nil {

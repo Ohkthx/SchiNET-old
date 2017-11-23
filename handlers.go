@@ -211,7 +211,7 @@ func (conf *Config) guildMemberAddHandler(s *discordgo.Session, nu *discordgo.Gu
 
 	tn := time.Now()
 	// Add the new user to the database.
-	if err := UserUpdateSimple(nu.GuildID, nu.User, 0, tn); err != nil {
+	if err := UserUpdateSimple(nu.User, 0, tn); err != nil {
 		fmt.Println("Adding new user to database: " + err.Error())
 	}
 

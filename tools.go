@@ -141,7 +141,7 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 	}
 
 	// Check if an alias here
-	alias := AliasNew(dat.io[0], "", dat.user)
+	alias := AliasNew(dat.io[0], "", dat.guild.ID, dat.user)
 	link, err := alias.Check()
 	if err != nil {
 		if err != mgo.ErrNotFound {

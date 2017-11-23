@@ -301,7 +301,7 @@ func (g *GuildConfig) Get() error {
 
 	q["id"] = g.ID
 
-	var dbdat = DBdataCreate(g.Name, CollectionConfig, GuildConfig{}, q, nil)
+	var dbdat = DBdataCreate(g.ID, CollectionConfig, GuildConfig{}, q, nil)
 	err := dbdat.dbGet(GuildConfig{})
 	if err != nil {
 		return err
@@ -338,7 +338,7 @@ func (g *GuildConfig) Update() error {
 		"prefix": g.Prefix,
 	}
 
-	var dbdat = DBdataCreate(g.Name, CollectionConfig, g, q, c)
+	var dbdat = DBdataCreate(g.ID, CollectionConfig, g, q, c)
 	err = dbdat.dbEdit(GuildConfig{})
 	if err != nil {
 		if err == mgo.ErrNotFound {

@@ -426,7 +426,7 @@ func (con *console) watchGetLast(watch WatchLog, amount int) error {
 	}
 
 	var err error
-	dbdat := DBdataCreate(watch.guildName, CollectionMessages, Message{}, q, nil)
+	dbdat := DBdataCreate(watch.guildID, CollectionMessages, Message{}, q, nil)
 	if err = dbdat.dbGetWithLimit(Message{}, []string{"-timestamp"}, amount); err != nil {
 		return err
 	}

@@ -15,7 +15,7 @@ import (
 type Ticket struct {
 	ID         string `bson:"_id,omitempty"`
 	TicketID   int
-	Server     string   // Server/Database of the ticket.
+	ServerID   string   // Server/Database of the ticket.
 	Title      string   // General idea what ticket is about.
 	Comment    string   // Larger description.
 	Notes      []string // Note from admin/developer regarding ticket.
@@ -27,10 +27,10 @@ type Ticket struct {
 	DateClosed time.Time
 }
 
-func ticketNew(server, title, comment string, status bool, tID int, addedBy *User) Ticket {
+func ticketNew(serverID, title, comment string, status bool, tID int, addedBy *User) Ticket {
 	return Ticket{
 		TicketID:  tID,
-		Server:    server,
+		ServerID:  serverID,
 		Title:     title,
 		Comment:   comment,
 		Open:      status,
@@ -73,7 +73,7 @@ func (dat *IOdata) CoreTickets() error {
 		}
 	}
 
-	t := ticketNew(dat.guild.Name, title, comment, close, tID, dat.user)
+	t := ticketNew(dat.guild.ID, title, comment, close, tID, dat.user)
 
 	switch {
 	case get:
@@ -160,7 +160,7 @@ func (dat *IOdata) CoreTickets() error {
 		dat.msgEmbed = embedCreator(text, ColorGreen)
 	case list:
 		var err error
-		dat.output, err = ticketList(t.Server)
+		dat.output, err = ticketList(t.ServerID)
 		if err != nil {
 			return err
 		}
@@ -179,7 +179,7 @@ func (t *Ticket) Get(tID int) error {
 
 	q["ticketid"] = tID
 
-	dbdat := DBdataCreate(t.Server, CollectionTickets, Ticket{}, q, nil)
+	dbdat := DBdataCreate(t.ServerID, CollectionTickets, Ticket{}, q, nil)
 	err := dbdat.dbGet(Ticket{})
 	if err != nil {
 		return err
@@ -200,7 +200,7 @@ func (t *Ticket) Update() error {
 	if t.TicketID < 0 {
 		var n int
 		var err error
-		dbdat := DBdataCreate(t.Server, CollectionTickets, t, nil, nil)
+		dbdat := DBdataCreate(t.ServerID, CollectionTickets, t, nil, nil)
 		if n, err = dbdat.dbCount(); err != nil {
 			return err
 		}
@@ -212,7 +212,7 @@ func (t *Ticket) Update() error {
 
 	q["ticketid"] = t.TicketID
 	c["$set"] = bson.M{
-		"server":     t.Server,
+		"serverID":   t.ServerID,
 		"title":      t.Title,
 		"comment":    t.Comment,
 		"notes":      t.Notes,
@@ -224,7 +224,7 @@ func (t *Ticket) Update() error {
 		"dateclosed": t.DateClosed,
 	}
 
-	dbdat := DBdataCreate(t.Server, CollectionTickets, t, q, c)
+	dbdat := DBdataCreate(t.ServerID, CollectionTickets, t, q, c)
 	err = dbdat.dbEdit(Ticket{})
 	if err != nil {
 		if err == mgo.ErrNotFound {

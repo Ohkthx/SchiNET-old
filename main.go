@@ -16,7 +16,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.8.7"
+	_version       = "0.9.0"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -143,12 +143,6 @@ func main() {
 		return
 	}
 
-	// Process the default bot command aliases.
-	if err := cfg.defaultAliases(); err != nil {
-		fmt.Println(err)
-		os.Exit(0)
-	}
-
 	// Load all alliances so that servers will be bridged correctly.
 	if err := cfg.AlliancesLoad(); err != nil {
 		fmt.Println(err)
@@ -176,6 +170,11 @@ func main() {
 		// Update guild... even in failure (failed shouldn't be saved).
 		if err = g.Update(); err != nil {
 			fmt.Println("Role Correction, updating: " + err.Error())
+		}
+
+		// Process the default bot command aliases.
+		if err := cfg.defaultAliases(g.ID); err != nil {
+			fmt.Println("Setting default aliases: ", err.Error())
 		}
 	}
 
@@ -238,7 +237,7 @@ func clientLaunch() {
 }
 
 // Used to verify/register default aliases.
-func (cfg *Config) defaultAliases() error {
+func (cfg *Config) defaultAliases(serverID string) error {
 
 	type aliasSimple struct {
 		caller string
@@ -254,7 +253,7 @@ func (cfg *Config) defaultAliases() error {
 
 	for _, a := range aliases {
 		user := UserNew(cfg.Core.User)
-		alias := AliasNew(a.caller, a.linked, user)
+		alias := AliasNew(a.caller, a.linked, serverID, user)
 		if err := alias.Update(); err != nil {
 			return err
 		}

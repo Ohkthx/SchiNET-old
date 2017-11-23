@@ -66,7 +66,7 @@ func (dat *IOdata) CoreAlias() error {
 		if caller == "" {
 			return errors.New("bad alias name")
 		}
-		alias := AliasNew(caller, linked, u)
+		alias := AliasNew(caller, linked, dat.guild.ID, u)
 		if add {
 			if linked == "" {
 				return errors.New("bad original command")
@@ -88,7 +88,7 @@ func (dat *IOdata) CoreAlias() error {
 		}
 	} else if list {
 		var err error
-		alias := AliasNew("", "", u)
+		alias := AliasNew("", "", dat.guild.ID, u)
 		dat.output, err = alias.List()
 		if err != nil {
 			return err
@@ -101,11 +101,12 @@ func (dat *IOdata) CoreAlias() error {
 }
 
 // AliasNew returns a new Alias Object.
-func AliasNew(caller, link string, user *User) *Alias {
+func AliasNew(caller, link, serverID string, user *User) *Alias {
 	return &Alias{
-		Caller:  caller,
-		Linked:  link,
-		AddedBy: user.Basic(),
+		Caller:   caller,
+		Linked:   link,
+		ServerID: serverID,
+		AddedBy:  user.Basic(),
 	}
 }
 
@@ -119,7 +120,7 @@ func (a *Alias) Update() error {
 		"addedby": a.AddedBy,
 	}
 
-	dbdat := DBdataCreate(a.AddedBy.Server, CollectionAlias, a, q, c)
+	dbdat := DBdataCreate(a.ServerID, CollectionAlias, a, q, c)
 	err := dbdat.dbEdit(Alias{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
@@ -139,7 +140,7 @@ func (a *Alias) Get() error {
 	var q = make(map[string]interface{})
 	q["caller"] = a.Caller
 
-	dbdat := DBdataCreate(a.AddedBy.Server, CollectionAlias, Alias{}, q, nil)
+	dbdat := DBdataCreate(a.ServerID, CollectionAlias, Alias{}, q, nil)
 	err := dbdat.dbGet(Alias{})
 	if err != nil {
 		return err
@@ -158,7 +159,7 @@ func (a *Alias) Get() error {
 
 // GetAll aliases from database.
 func (a *Alias) GetAll() ([]Alias, error) {
-	db := DBdataCreate(a.AddedBy.Server, CollectionAlias, Alias{}, nil, nil)
+	db := DBdataCreate(a.ServerID, CollectionAlias, Alias{}, nil, nil)
 	if err := db.dbGetAll(Alias{}); err != nil {
 		return nil, err
 	}
@@ -182,7 +183,7 @@ func (a *Alias) Remove() error {
 		return nil
 	}
 
-	db := DBdataCreate(a.AddedBy.Server, CollectionAlias, a, nil, nil)
+	db := DBdataCreate(a.ServerID, CollectionAlias, a, nil, nil)
 	if err := db.dbDeleteID(a.ID); err != nil {
 		return err
 	}

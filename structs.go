@@ -148,7 +148,6 @@ type ChannelInfo struct {
 // UserBasic is just simple information to determine a user.
 type UserBasic struct {
 	ID            string
-	Server        string
 	Name          string
 	Discriminator string
 }
@@ -160,10 +159,11 @@ type Command struct {
 
 // Alias contains information regarding an alias link.
 type Alias struct {
-	ID      bson.ObjectId `bson:"_id,omitempty"`
-	Caller  string        // String that calls the alias.
-	Linked  string        // What the real command is.
-	AddedBy UserBasic     // Person who added alias.
+	ID       bson.ObjectId `bson:"_id,omitempty"`
+	Caller   string        // String that calls the alias.
+	Linked   string        // What the real command is.
+	ServerID string        // ID of the server.
+	AddedBy  UserBasic     // Person who added alias.
 }
 
 // WatchLog holds basic information about a channel/server to be watched.

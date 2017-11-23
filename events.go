@@ -62,7 +62,7 @@ func (dat *IOdata) CoreEvent() error {
 	} else if list {
 		var err error
 		var ev *Event
-		if ev, err = EventNew(dat.guild.Name, "", "", "", dat.user, false); err != nil {
+		if ev, err = EventNew(dat.guild.ID, "", "", "", dat.user, false); err != nil {
 			return err
 		}
 
@@ -82,7 +82,7 @@ func (dat *IOdata) CoreEvent() error {
 		}
 		var err error
 		var ev *Event
-		if ev, err = EventNew(dat.guild.Name, comment, day, time, dat.user, persist); err != nil {
+		if ev, err = EventNew(dat.guild.ID, comment, day, time, dat.user, persist); err != nil {
 			return err
 		}
 
@@ -105,7 +105,7 @@ func (dat *IOdata) CoreEvent() error {
 
 	var err error
 	var ev *Event
-	if ev, err = EventNew(dat.guild.Name, "", "", "", dat.user, false); err != nil {
+	if ev, err = EventNew(dat.guild.ID, "", "", "", dat.user, false); err != nil {
 		return err
 	}
 
