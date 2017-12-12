@@ -36,6 +36,7 @@ __Requirements for a Moderator command to be used:__
 | | clear | | **Fast** clear messages, leverages "bulk deletion" but has restrictions. |
 | | clear-slow | | Slow clear messages, deletes each message individually. No restrictions. |
 | [Ally](#ally) | ally | - | Allows the linking of 2 servers/guilds through a common channel. |
+| [Vote](#vote) | vote | - | Creates a poll for users to vote on. |
 
 ### Events
 
@@ -120,6 +121,29 @@ Example of Breaking an alliance using 2 guilds, requires only 1 guild:
 | Guild/Server |Command | Explaination |
 | ------ | ------ | ------ |
 | Guild1 | ally --delete --name "Our_alliance" | Destroys the alliance on both ends regardless of which guild does it. |
+
+### Vote
+
+---
+
+Vote creates a poll so you can get feedback from the community on a particular subject. It can be created by Moderators and users pick between the 👍 and 👎 reactions to make their choice.
+
+All polls are posted in their own channel that is created (if it doesn't exist) at #vote.
+
+Explaination of the various flags:
+
+| Flag | Long Flag | Action |
+| ------ | ------ | ------ |
+| -t | --title | Title for the poll. |
+| -d | --description | Description of the poll. |
+| -h | --help | Prints out a help message, quick reference. |
+
+Examples:
+
+| Command | Explaination |
+| ------ | ------ |
+| vote --title "Do you like pie?" | Creates a poll with only the title of "Do you like pie?" |
+| vote -t "Do you like pie?" -d "Make your choice you monster." | Creates a new poll with Title: "Do you like pie?"  Description: "Make your choice you monster. |
 
 SchiNET's source is available at the [Main][Home] page!
 

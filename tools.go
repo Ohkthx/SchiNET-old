@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"strconv"
 	"strings"
@@ -90,6 +91,10 @@ func msgToIOdata(msg *discordgo.MessageCreate, cmdPrefix string) *IOdata {
 	dat.msg = msg
 
 	return &dat
+}
+
+func emojiIntToStr(decimal int) string {
+	return html.UnescapeString("&#" + strconv.Itoa(decimal) + ";")
 }
 
 func sliceToIOdata(b *godbot.Core, s []string, cmdPrefix string) *IOdata {
@@ -186,6 +191,8 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 		return dat.messageClear(cfg.Core.Session, "fast")
 	case "clear-slow":
 		return dat.messageClear(cfg.Core.Session, "slow")
+	case "vote":
+		return dat.CoreVote()
 	case "admin":
 		return cfg.CoreAdmin(dat)
 	case "echo":
