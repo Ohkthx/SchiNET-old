@@ -125,7 +125,7 @@ func (conf *Config) createGuildRoles(guildConfig *GuildConfig, guildID string) e
 	rolesNew := make(map[string]int)
 	rolesNew["SchiNET-Administrator"] = rolePermissionAdmin
 	rolesNew["SchiNET-Moderator"] = rolePermissionMod
-	rolesNew["SchiNET-Banned"] = 0
+	rolesNew["SchiNET-Restricted"] = 0
 
 	// Iterate the guild names that need to be added.
 	for roleName, roleValue := range rolesNew {
@@ -211,12 +211,7 @@ func (conf *Config) GuildConfigLoad() error {
 		var gc = newGuildConfig(g.ID, g.Name)
 		if err := gc.Get(); err != nil {
 			if err == mgo.ErrNotFound {
-				/*
-					gc.Name = g.Name
-					gc.Prefix = envCMDPrefix
-					if err = gc.Update(); err != nil {
-						return err
-					}*/
+				fmt.Printf("DEBUG: New Guild while while loading:\n [%s] %s\n", g.ID, g.Name)
 				ng := &discordgo.GuildCreate{Guild: g}
 				conf.guildCreateHandler(conf.Core.Session, ng)
 				return nil
@@ -433,6 +428,12 @@ func (g *GuildConfig) RoleCorrection(s *discordgo.Session) error {
 				}
 				// Update the running permission value if editting succeeded.
 				g.Roles[n].Value = newValue
+			} else if roleFound.Name == "SchiNET-Banned" {
+				_, err = s.GuildRoleEdit(g.ID, role.ID, "SchiNET-Restricted", roleFound.Color, roleFound.Hoist, roleFound.Permissions, roleFound.Mentionable)
+				if err != nil {
+					return err
+				}
+				g.Roles[n].Name = "SchiNET-Restricted"
 			}
 			continue
 		}

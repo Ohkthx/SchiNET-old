@@ -16,7 +16,7 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.9.0"
+	_version       = "0.9.1"
 	envToken       = os.Getenv("BOT_TOKEN")
 	envDBUrl       = os.Getenv("BOT_DBURL")
 	envCMDPrefix   = os.Getenv("BOT_PREFIX")
@@ -98,6 +98,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
 	// Assign ugly globals
 	// TAG: TODO - fix this by finding an alternative.
 	Mgo = cfg.DB

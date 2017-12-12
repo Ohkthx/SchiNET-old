@@ -93,7 +93,7 @@ type Message struct {
 // Event has information regarding upcoming events.
 type Event struct {
 	ID          bson.ObjectId `bson:"_id,omitempty"`
-	Server      string
+	ServerID    string
 	Description string
 	Day         string
 	HHMM        string

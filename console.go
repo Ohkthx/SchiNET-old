@@ -83,6 +83,10 @@ func (con *console) Parser() error {
 	case "watch":
 		return con.Watch()
 
+	// Get info regarding a guild.
+	case "info":
+		return con.Info()
+
 	// Kill a watcher/logger.
 	case "kill":
 		return con.WatchKill()
@@ -176,17 +180,13 @@ func (con *console) Watch() error {
 		input = stripWhiteSpace(input)
 		num, err = strconv.Atoi(input)
 		if strings.ToLower(input) == "exit" {
-			break
+			return nil
 		} else if err != nil {
 			num = -1
 			continue
 		} else if num >= 0 && num <= len(guilds) {
 			break
 		}
-	}
-
-	if strings.ToLower(input) == "exit" {
-		return nil
 	}
 
 	var watched WatchLog
@@ -224,7 +224,7 @@ func (con *console) Watch() error {
 		input = stripWhiteSpace(input)
 		num, err = strconv.Atoi(input)
 		if strings.ToLower(input) == "exit" {
-			break
+			return nil
 		} else if err != nil {
 			num = -1
 			continue
@@ -233,9 +233,7 @@ func (con *console) Watch() error {
 		}
 	}
 
-	if strings.ToLower(input) == "exit" {
-		return nil
-	} else if num > 0 && num <= len(channels) {
+	if num > 0 && num <= len(channels) {
 		watched.channelID = channels[num-1].ID
 		watched.channelName = channels[num-1].Name
 	} else {
@@ -470,8 +468,45 @@ func (watch WatchLog) Talk(msg string) {
 	watch.channel <- msg
 }
 
+// Info will display bits of the guild structure.
+func (con *console) Info() error {
+	var guilds = con.config.Core.Guilds
+	// List available guilds.
+	fmt.Println("Select a guild by number: ")
+	for n, g := range guilds {
+		fmt.Printf(" [%2d] %s\n", n, g.Name)
+	}
+
+	var num = -1
+	var input string
+	var err error
+	reader := bufio.NewReader(os.Stdin)
+
+	// Run until either ",quit" or a valid option is selected.
+	for num < 0 {
+		fmt.Print("Guild number [type 'exit' to exit]: ")
+		input, _ = reader.ReadString('\n')
+		input = stripWhiteSpace(input)
+		num, err = strconv.Atoi(input)
+		if strings.ToLower(input) == "exit" {
+			break
+		} else if err != nil {
+			num = -1
+			continue
+		} else if num >= 0 && num < len(guilds) {
+			break
+		}
+	}
+
+	guild := con.config.Core.Guilds[num]
+	fmt.Printf("\n%s\n ID: %s\n Members: %d\n Region: %s\n\n",
+		guild.Name, guild.ID, guild.MemberCount, guild.Region)
+
+	return nil
+}
+
 func consoleHelp() string {
-	text := [...]string{"check", "watch", "reset", "kill", "help", "exit"}
+	text := [...]string{"check", "watch", "reset", "kill", "info", "help", "exit"}
 
 	var retText string
 	for n, w := range text {

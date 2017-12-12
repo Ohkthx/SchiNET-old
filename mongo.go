@@ -53,7 +53,7 @@ type DBHandler struct {
 }
 
 // DBdataCreate creates a database object used to get exchange information with mongodb
-func DBdataCreate(db, coll string, doc interface{}, q bson.M, c bson.M) *DBdata {
+func DBdataCreate(db, coll string, doc interface{}, q, c bson.M) *DBdata {
 	return &DBdata{Handler: Mgo, Database: dbSafe(db), Collection: coll, Document: doc, Query: q, Change: c}
 }
 

@@ -131,7 +131,7 @@ func EventNew(database, desc, day, t string, u *User, persist bool) (*Event, err
 	}
 
 	return &Event{
-		Server:      database,
+		ServerID:    database,
 		Description: desc,
 		Day:         day,
 		HHMM:        t,
@@ -144,7 +144,7 @@ func EventNew(database, desc, day, t string, u *User, persist bool) (*Event, err
 // Add stores an Event in the Database.
 func (ev *Event) Add() (string, error) {
 
-	dbdat := DBdataCreate(ev.Server, CollectionEvents, ev, nil, nil)
+	dbdat := DBdataCreate(ev.ServerID, CollectionEvents, ev, nil, nil)
 	if err := dbdat.dbInsert(); err != nil {
 		return "", err
 	}
@@ -166,7 +166,7 @@ func (ev *Event) Delete() (string, error) {
 
 	// Create the query, get the Event.
 	q["$and"] = []bson.M{bson.M{"day": ev.Day}, bson.M{"hhmm": ev.HHMM}}
-	var dbdat = DBdataCreate(ev.Server, CollectionEvents, Event{}, q, nil)
+	var dbdat = DBdataCreate(ev.ServerID, CollectionEvents, Event{}, q, nil)
 	if err := dbdat.dbGet(Event{}); err != nil {
 		if err == mgo.ErrNotFound {
 			return "", fmt.Errorf("event not found: %s -> %s", ev.Day, ev.HHMM)
@@ -193,8 +193,10 @@ func (ev *Event) List() (string, error) {
 	var t = time.Now()
 	var cnt int
 
-	dbdat := DBdataCreate(ev.Server, CollectionEvents, nil, nil, nil)
-	dbdat.dbGetAll(Event{})
+	dbdat := DBdataCreate(ev.ServerID, CollectionEvents, nil, nil, nil)
+	if err := dbdat.dbGetAll(Event{}); err != nil {
+		return "", err
+	}
 
 	if len(dbdat.Documents) == 0 {
 		return "", errors.New("no events scheduled for this server")
@@ -219,7 +221,7 @@ func (ev *Event) List() (string, error) {
 			var c = make(map[string]interface{})
 			q["_id"] = ev.ID
 			c["$set"] = bson.M{"time": ev.Time}
-			var dbdat = DBdataCreate(ev.Server, CollectionEvents, ev, q, c)
+			var dbdat = DBdataCreate(ev.ServerID, CollectionEvents, ev, q, c)
 			err = dbdat.dbEdit(Event{})
 			if err != nil {
 				return "", err

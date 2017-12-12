@@ -1,3 +1,11 @@
+0.9.1 - Additions:
+            - Renamed "SchiNET-Banned" role to "SchiNET-Restricted"
+            - Debug message added to capture recreating a guild configuration.
+            - "Info" added as a console command to get basic information of a discord server.
+        Fixes:
+            - Removed some unneeded code.
+            - Events are stored based on Server's ID.
+
 0.9.0 - Additions:
             - Information stored into database now stored based on Guild ID and not Guild Name.
         Fixes:

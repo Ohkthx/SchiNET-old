@@ -96,14 +96,18 @@ func (conf *Config) guildCreateHandler(s *discordgo.Session, ng *discordgo.Guild
 			fmt.Println("Updating guild on new guild added: " + err.Error())
 		}
 
-		// Notify the main channel that the bot has been added and WHO has the ultimate admin privledges.
-		embedMsg := embedCreator(fmt.Sprintf("Hello all, nice to meet you!\n<@%s> has been given the **Admin** privileges for <@%s> on this server.\nMy documentation is located at:\n%s\n", admin.ID, conf.Core.User.ID, helpDocs), ColorYellow)
-		s.ChannelMessageSendEmbed(ng.ID, embedMsg)
+		/*
+			// Notify the main channel that the bot has been added and WHO has the ultimate admin privledges.
+			embedMsg := embedCreator(fmt.Sprintf("Hello all, nice to meet you!\n<@%s> has been given the **Admin** privileges for <@%s> on this server.\nMy documentation is located at:\n%s\n", admin.ID, conf.Core.User.ID, helpDocs), ColorYellow)
+			s.ChannelMessageSendEmbed(ng.ID, embedMsg)
 
-		// Send a greeting to the Admin informing of the addition.
-		if err := conf.dmAdmin(s, ng.OwnerID, ng.Name); err != nil {
-			fmt.Println(err)
-		}
+			// Send a greeting to the Admin informing of the addition.
+			if err := conf.dmAdmin(s, ng.OwnerID, ng.Name); err != nil {
+				fmt.Println(err)
+			}
+		*/
+		fmt.Println("DEBUG: Would have notified GM of \"new\" guild.")
+		fmt.Printf(" [%s] %s\n", guildConfig.ID, guildConfig.Name)
 	}
 }
 

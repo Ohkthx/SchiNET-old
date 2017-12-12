@@ -18,7 +18,7 @@ This section is dedicated to the use of user commands. If you have any further q
 
 ---
 
-User commands are accessible by everyone that has **NOT** been reported for `abuse` and not in the `SchiNET-Banned`. User commands can do anything from displaying data such as events to gambling!
+User commands are accessible by everyone that has **NOT** been reported for `abuse` and not in the `SchiNET-Restricted`. User commands can do anything from displaying data such as events to gambling!
 
 __Requirements for a User commands:__
 
