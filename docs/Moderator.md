@@ -136,6 +136,7 @@ Explaination of the various flags:
 | ------ | ------ | ------ |
 | -t | --title | Title for the poll. |
 | -d | --description | Description of the poll. |
+| -g | --get | Retieve the unique votes from the poll. Provide the message ID. |
 | -h | --help | Prints out a help message, quick reference. |
 
 Examples:
@@ -144,6 +145,7 @@ Examples:
 | ------ | ------ |
 | vote --title "Do you like pie?" | Creates a poll with only the title of "Do you like pie?" |
 | vote -t "Do you like pie?" -d "Make your choice you monster." | Creates a new poll with Title: "Do you like pie?"  Description: "Make your choice you monster. |
+| vote --get 12345678998 | The bot will message you poll statistics for the selected message ID. |
 
 SchiNET's source is available at the [Main][Home] page!
 

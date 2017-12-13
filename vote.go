@@ -17,18 +17,18 @@ const (
 
 // CoreVote processes all voting related additions.
 func (dat *IOdata) CoreVote() error {
-
 	if ok := dat.user.HasRoleType(dat.guildConfig, rolePermissionMod); !ok {
 		return ErrBadPermissions
 	}
 
 	fl := getopt.New()
-	var title, description string
+	var title, description, msgID string
 	var help bool
 
 	// Generics
 	fl.FlagLong(&title, "title", 't', "Title of the poll.")
 	fl.FlagLong(&description, "description", 'd', "Description")
+	fl.FlagLong(&msgID, "get", 'g', "Message ID to retrieve information.")
 	fl.FlagLong(&help, "help", 'h', "This message")
 
 	if err := fl.Getopt(dat.io, nil); err != nil {
@@ -40,7 +40,9 @@ func (dat *IOdata) CoreVote() error {
 		}
 	}
 
-	if title != "" {
+	if msgID != "" {
+		return dat.voteGet(msgID)
+	} else if title != "" {
 		// Create #vote here and create the poll.
 		return dat.voteCreate(title, description)
 	}
@@ -49,6 +51,102 @@ func (dat *IOdata) CoreVote() error {
 	prefix := "**Need** __title__.\n\n"
 	suffix := "\n\nExamples:\n" + voteSyntaxAll
 	dat.output = Help(fl, prefix, suffix)
+	return nil
+}
+
+// voteGet information for a particular poll.
+func (dat *IOdata) voteGet(msgID string) error {
+	s := dat.session
+	// Get our channels from the server.
+	channels, err := s.GuildChannels(dat.guild.ID)
+	if err != nil {
+		return err
+	}
+
+	// Check if the channel exists already.
+	var ch *discordgo.Channel
+	for _, c := range channels {
+		if c.Name == "vote" {
+			ch = c
+			break
+		}
+	}
+
+	if ch == nil {
+		return errors.New("channel doesn't exist, message doesn't exist :frowning: ")
+	}
+
+	var thumbsUp, thumbsDown, tU, tD []string
+	users, err := s.MessageReactions(ch.ID, msgID, emojiIntToStr(128077), 100)
+	if err != nil {
+		return errors.New("couldn't find our message :frowning: ")
+	}
+	for _, u := range users {
+		thumbsUp = append(thumbsUp, u.String())
+	}
+
+	users, err = s.MessageReactions(ch.ID, msgID, emojiIntToStr(128078), 100)
+	if err != nil {
+		return errors.New("couldn't find our message :frowning: ")
+	}
+	for _, u := range users {
+		thumbsDown = append(thumbsDown, u.String())
+	}
+
+	arrayCheck := func(s string, a []string) bool {
+		for _, i := range a {
+			if s == i {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Cycle our Thumbs Up that are unique.
+	for _, u := range thumbsUp {
+		if ok := arrayCheck(u, thumbsDown); !ok {
+			tU = append(tU, u)
+		}
+	}
+
+	for _, u := range thumbsDown {
+		if ok := arrayCheck(u, thumbsUp); !ok {
+			tD = append(tD, u)
+		}
+	}
+
+	var toSend = "```"
+	if len(tU) > 0 {
+		for _, u := range tU {
+			toSend += "👍 " + u + "\n"
+		}
+	} else {
+		toSend += "👍 none\n"
+	}
+
+	toSend += "\n"
+	if len(tD) > 0 {
+		for _, u := range tD {
+			toSend += "👎 " + u + "\n"
+		}
+	} else {
+		toSend += "👎 none"
+	}
+	toSend += "```"
+
+	// Create the DM channel
+	var channel *discordgo.Channel
+	channel, err = s.UserChannelCreate(dat.user.ID)
+	if err != nil {
+		return err
+	}
+
+	// Send notification/Greeting over the DM channel.
+	if _, err = s.ChannelMessageSend(channel.ID, toSend); err != nil {
+		return err
+	}
+
+	dat.output = "Poll information sent for Message ID: " + msgID
 	return nil
 }
 
