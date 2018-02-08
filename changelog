@@ -1,3 +1,10 @@
+0.9.4 - Additions:
+            - Configuration File support added instead of relying on variables with auto-creation.
+            - "Thank You" tribute to those who donate to https://www.gofundme.com/Schism
+            - Auto-sorts based on amount donated.
+        Fixes:
+            - Removed unneeded and repetitive error checking from functions.
+
 0.9.3 - Additions:
             - Vote Poll information now obtainable with '--get' flag.
 

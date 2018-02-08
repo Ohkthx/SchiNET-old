@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -16,14 +18,8 @@ import (
 
 // Constants used to initiate and customize bot.
 var (
-	_version       = "0.9.2"
-	envToken       = os.Getenv("BOT_TOKEN")
-	envDBUrl       = os.Getenv("BOT_DBURL")
-	envCMDPrefix   = os.Getenv("BOT_PREFIX")
-	envPBDK        = os.Getenv("BOT_PBDevKey")
-	envPBPW        = os.Getenv("BOT_PBPW")
-	envPB          = os.Getenv("BOT_PB")
-	envBotGuild    = os.Getenv("BOT_GUILD")
+	_version       = "0.9.4"
+	ConfigFile     ConfigJSON
 	helpDocs       = "https://github.com/d0x1p2/SchiNET/blob/master/docs/README.md"
 	consoleDisable bool   // Argument to run in background or to run as a console.
 	DEBUG          bool   // Argument as to if this is a DEBUGGED session.
@@ -32,6 +28,8 @@ var (
 	watcherHost    string // Argument for WatachLog Host.
 	execute        string // Argument for Execute a command in a new window.
 	cmds           map[string]map[string]string
+
+	Mgo *mgo.Session // Public access to the MGO drivers.
 )
 
 func init() {
@@ -71,10 +69,22 @@ func init() {
 	cmds["normal"]["ticket"] = "Add a bug to the ticket system!"
 }
 
-// Mgo is for the global database session.
-var Mgo *mgo.Session
-
 func main() {
+	// Check if our configuration exists. If not create it.
+	ConfigFile = ConfigJSON{}
+	if ok := ConfigFile.Processor(); !ok {
+		newPause()
+		return
+	}
+
+	// Use the DEBUG token if launching in debug mode.
+	if DEBUG && ConfigFile.Token != "" {
+		ConfigFile.Token = ConfigFile.TokenDebug
+	} else if DEBUG && ConfigFile.Token == "" {
+		fmt.Println("'conf.json' needs debug token specified.")
+		return
+	}
+
 	// If it is a watcher, just start the client and return once complete.
 	if watcherEnabled {
 		// Return if we don't have the information to connect.
@@ -85,17 +95,13 @@ func main() {
 		os.Exit(0)
 	}
 
+	var err error
 	var cfg = &Config{}
 
-	if envToken == "" {
-		return
-	}
-
-	var err error
 	// Connect to our Database.
-	cfg.DB, err = mgo.Dial(envDBUrl)
+	cfg.DB, err = mgo.Dial(ConfigFile.DBURL)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Connection to database:", err)
 		return
 	}
 
@@ -104,7 +110,7 @@ func main() {
 	Mgo = cfg.DB
 
 	// Create a new instance of the bot.
-	cfg.Core, err = godbot.New(envToken)
+	cfg.Core, err = godbot.New(ConfigFile.Token)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -271,7 +277,7 @@ func (cfg *Config) dmAdmin(s *discordgo.Session, uID, server string) error {
 		"An example of how to display basic user information:\n"+
 		"`,user`\n\n"+
 		"If you have additional questions, you can:\n+ Use the `,help` command\n+ Join us at %s\n+ Read the Easy-To-Use Documentation: %s",
-		uID, server, envBotGuild, helpDocs)
+		uID, server, ConfigFile.GuildURL, helpDocs)
 
 	// Create the DM channel
 	var channel *discordgo.Channel
@@ -285,4 +291,86 @@ func (cfg *Config) dmAdmin(s *discordgo.Session, uID, server string) error {
 		return err
 	}
 	return nil
+}
+
+// Processor is required to load or create a configuration.
+func (config *ConfigJSON) Processor() bool {
+	fmt.Println("Loading the configuration file: 'config.json'")
+	// Check if our configuration exists.
+	file, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println("Error occured! Going to create a configuration file for you.")
+
+		// Create out temporary config.
+		DummyConfig := ConfigJSON{DBURL: "127.0.0.1", Prefix: ","}
+
+		*config = DummyConfig
+
+		// Save this temporary config.
+		if ok := config.Save(); !ok {
+			// Configuration Save failed... pause and return.
+			return false
+		}
+
+		return false
+	}
+
+	// Process our configuration file.
+	decoder := json.NewDecoder(file)
+	if err = decoder.Decode(&config); err != nil {
+		fmt.Println("Error occured while loading configuration:", err)
+		return false
+	}
+
+	// Validate the configuration.
+	if ok := config.Validator(); !ok {
+		return false
+	}
+
+	return true
+}
+
+// Validator confirms a load configuration is good for use.
+func (config *ConfigJSON) Validator() bool {
+	// Check that our configuration file has data.
+	// TODO: Disable features not specified instead of quitting/exiting.
+	if ConfigFile.Token == "" {
+		fmt.Println("'conf.json' needs a proper discord token.")
+	} else if ConfigFile.DBURL == "" {
+		fmt.Println("'conf.json' needs a mongodb URL/IP specified.")
+	} else if ConfigFile.Prefix == "" {
+		fmt.Println("'conf.json' needs a command prefix specified.")
+	} else if ConfigFile.GuildURL == "" {
+		fmt.Println("'conf.json' needs a URL for the main guild specified.")
+	} else if ConfigFile.PastebinAcct == "" {
+		fmt.Println("'conf.json' needs a Pastebin user account specified.")
+	} else if ConfigFile.PastebinPW == "" {
+		fmt.Println("'conf.json' needs your Pastebin password specified.")
+	} else if ConfigFile.PastebinToken == "" {
+		fmt.Println("'conf.json' needs the Pastebin token.")
+	} else {
+		return true
+	}
+
+	return false
+}
+
+// Save the configuration.
+func (config *ConfigJSON) Save() bool {
+	// Convert our configuration to characters with proper indention.
+	prettyJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		fmt.Println("Error occured while converting converting configuration:", err)
+		return false
+	}
+
+	// Write the converted configuration.
+	if err := ioutil.WriteFile("config.json", prettyJSON, 0644); err != nil {
+		fmt.Println("Error occured while writing to configuration file:", err)
+		return false
+	}
+
+	fmt.Println("Configuration saved to: 'config.json'")
+
+	return true
 }

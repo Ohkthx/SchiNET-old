@@ -41,6 +41,7 @@ __Requirements for a User commands:__
 | | top10 | | Checks if you're elite enough to be in the top 10! |
 | | roll | | Rolls 2 6D, highest roll wins. |
 | | echo | *[insert text here]* | Repeats (echos) the text from SchiNET! |
+| | ty | | Displays a list of people who I deeply appreciate. |
 
 ### User
 

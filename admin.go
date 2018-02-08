@@ -35,7 +35,7 @@ func (conf *Config) CoreAdmin(dat *IOdata) error {
 	if arg == "reset" {
 		// Reset Guild Config here... update.
 		update = true
-		dat.guildConfig.Prefix = envCMDPrefix
+		dat.guildConfig.Prefix = ConfigFile.Prefix
 		if err := conf.Core.SetNickname(dat.guild.ID, "", false); err != nil {
 			return err
 		}
@@ -234,10 +234,8 @@ func (conf *Config) GuildConfigManager(guild *GuildConfig) error {
 	for n, g := range conf.GuildConf {
 		if g.ID == guild.ID {
 			conf.GuildConf[n] = guild
-			if err := guild.Update(); err != nil {
-				return err
-			}
-			return nil
+			err := guild.Update()
+			return err
 		}
 	}
 
@@ -306,7 +304,7 @@ func (g *GuildConfig) Get() error {
 	guild = dbdat.Document.(GuildConfig)
 
 	if guild.Prefix == "" {
-		guild.Prefix = envCMDPrefix
+		guild.Prefix = ConfigFile.Prefix
 	}
 
 	*g = guild
@@ -321,7 +319,7 @@ func (g *GuildConfig) Update() error {
 	var c = make(map[string]interface{})
 
 	if g.Prefix == "" {
-		g.Prefix = envCMDPrefix
+		g.Prefix = ConfigFile.Prefix
 	}
 
 	q["id"] = g.ID
@@ -338,10 +336,8 @@ func (g *GuildConfig) Update() error {
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			// Add to DB since it doesn't exist.
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
+			err := dbdat.dbInsert()
+			return err
 		}
 		return err
 	}
@@ -478,10 +474,8 @@ func (conf *Config) InternalCorrection(guildID string) error {
 	}
 
 	if len(internal.PermissionOverwrites) == 0 {
-		if err := conf.Core.Session.ChannelPermissionSet(internal.ID, guildID, "role", 0, 0x00000400); err != nil {
-			return err
-		}
-		return nil
+		err := conf.Core.Session.ChannelPermissionSet(internal.ID, guildID, "role", 0, 0x00000400)
+		return err
 	}
 
 	// Check if the permissions are right... if not- update.
@@ -493,10 +487,8 @@ func (conf *Config) InternalCorrection(guildID string) error {
 				if p.Allow&0x00000400 == 0x00000400 {
 					p.Allow ^= 0x00000400
 				}
-				if err := conf.Core.Session.ChannelPermissionSet(internal.ID, p.ID, p.Type, p.Allow, p.Deny|0x00000400); err != nil {
-					return err
-				}
-				return nil
+				err := conf.Core.Session.ChannelPermissionSet(internal.ID, p.ID, p.Type, p.Allow, p.Deny|0x00000400)
+				return err
 			}
 			return nil
 		}

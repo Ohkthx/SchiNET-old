@@ -23,7 +23,7 @@ type console struct {
 func (cfg *Config) core() {
 	var err error
 	reader := bufio.NewReader(os.Stdin)
-	cmdPrefix := envCMDPrefix
+	cmdPrefix := ConfigFile.Prefix
 
 	for {
 		fmt.Printf("[%s] > ", time.Now().Format(time.Stamp))
@@ -106,17 +106,14 @@ func (con *console) Spawner(input []string) error {
 	// TAG: TODO - *nix compatible.
 	cmd := exec.Command("cmd", "/C", "start", "SchiNET.exe", "-exec", "\""+strings.Join(input, " ")+"\"")
 
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	return nil
+	err := cmd.Start()
+	return err
 }
 
 // OneTimeExec a series of commands then promptly exit.
 func (cfg *Config) OneTimeExec(input string) {
 	var err error
-	cmdPrefix := envCMDPrefix
+	cmdPrefix := ConfigFile.Prefix
 
 	_, s := strToCommands(input, cmdPrefix)
 	iodat := sliceToIOdata(cfg.Core, s, cmdPrefix)

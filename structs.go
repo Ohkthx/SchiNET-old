@@ -30,6 +30,18 @@ type Config struct {
 	children []*exec.Cmd
 }
 
+// ConfigJSON is what is loaded from a file.
+type ConfigJSON struct {
+	Token         string
+	TokenDebug    string
+	DBURL         string
+	Prefix        string
+	PastebinPW    string
+	PastebinAcct  string
+	PastebinToken string
+	GuildURL      string
+}
+
 // Bot is a wrapper for the godbot.Core
 type bot struct {
 	mu sync.Mutex

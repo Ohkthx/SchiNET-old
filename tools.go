@@ -195,9 +195,10 @@ func (cfg *Config) ioHandler(dat *IOdata) error {
 		return dat.CoreVote()
 	case "admin":
 		return cfg.CoreAdmin(dat)
+	case "contributions", "contributors", "donators", "contribute", "thanks", "ty":
+		dat.output = thankYou()
 	case "echo":
 		dat.output = echoMsg(dat.io[1:])
-		return nil
 	}
 	return nil
 }
@@ -330,7 +331,7 @@ func botInvite() string {
 			"Click to Add-> %s\n\n"+
 			"Bot Support Server -> %s\n",
 		"https://discordapp.com/oauth2/authorize?client_id=375083817565945867&scope=bot&permissions=469855422",
-		envBotGuild,
+		ConfigFile.GuildURL,
 	)
 	return msg
 }

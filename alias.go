@@ -124,10 +124,8 @@ func (a *Alias) Update() error {
 	err := dbdat.dbEdit(Alias{})
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
+			err := dbdat.dbInsert()
+			return err
 		}
 		return err
 	}
@@ -184,10 +182,8 @@ func (a *Alias) Remove() error {
 	}
 
 	db := DBdataCreate(a.ServerID, CollectionAlias, a, nil, nil)
-	if err := db.dbDeleteID(a.ID); err != nil {
-		return err
-	}
-	return nil
+	err := db.dbDeleteID(a.ID)
+	return err
 }
 
 // Check if an alias exists in a database.

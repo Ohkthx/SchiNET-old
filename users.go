@@ -194,10 +194,8 @@ func UserUpdateSimple(user *discordgo.User, inc int, ts time.Time) error {
 			u.Credits = 0
 			u.CreditsTotal = 0
 			u.LastSeen = ts
-			if err := u.Update(); err != nil {
-				return err
-			}
-			return nil
+			err := u.Update()
+			return err
 		}
 		return err
 	}
@@ -214,12 +212,9 @@ func UserUpdateSimple(user *discordgo.User, inc int, ts time.Time) error {
 		u.LastSeen = ts
 	}
 
-	if err := u.Update(); err != nil {
-		return err
-	}
+	err := u.Update()
 
-	return nil
-
+	return err
 }
 
 // Update pushes an update to the database.
@@ -242,10 +237,8 @@ func (u *User) Update() error {
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			// Add to DB since it doesn't exist.
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
+			err := dbdat.dbInsert()
+			return err
 		}
 		return err
 	}
@@ -378,10 +371,8 @@ func (u *User) BotAbuse(dat *IOdata, cID string, fl userFlags) error {
 		dat.output = Help(fl.flag, prefix, abuseSyntaxAll)
 		return nil
 	} else if fl.List {
-		if err = abuseList(dat, fl.serverName, fl.server); err != nil {
-			return err
-		}
-		return nil
+		err = abuseList(dat, fl.serverName, fl.server)
+		return err
 	}
 
 	if uID != "" {

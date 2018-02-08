@@ -98,8 +98,8 @@ func creditsReset() (string, error) {
 }
 
 func pasteIt(msg, title string) (string, error) {
-	p := go_pastebin.NewPastebin(envPBDK)
-	pb, err := p.GenerateUserSession(envPB, envPBPW)
+	p := go_pastebin.NewPastebin(ConfigFile.PastebinToken)
+	pb, err := p.GenerateUserSession(ConfigFile.PastebinAcct, ConfigFile.PastebinPW)
 	if err != nil {
 		return "", err
 	}
@@ -402,10 +402,8 @@ func (ch *ChannelInfo) Update() error {
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			// Add to DB since it doesn't exist.
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
+			err := dbdat.dbInsert()
+			return err
 		}
 		return err
 	}
@@ -424,4 +422,66 @@ func echoMsg(msg []string) string {
 		}
 	}
 	return output
+}
+
+type contributeList []contributor
+
+func (c contributeList) Len() int           { return len(c) }
+func (c contributeList) Less(i, j int) bool { return c[i].Amount < c[j].Amount }
+func (c contributeList) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+
+type contributor struct {
+	Handle, Message string
+	Amount          int
+}
+
+// thankYou is a tribute to those who have opted in for donating to: https://www.gofundme.com/Schism
+func thankYou() string {
+	header :=
+		"A big THANK YOU to those who have donated to:\n " +
+			"  --> <https://gofundme.com/Schism> \n\n" +
+			"All of your support continues to motivate me and I greatly appreciate it!"
+
+	type valText struct {
+		Value   int
+		Message string
+	}
+
+	// c for Contributions- map containing a key with the persons "name" and the value of their amount + personal message.
+	var c = make(map[string]valText)
+	c["Manager Baddy"] = valText{30, ""}
+	c["Beef"] = valText{20, ""}
+	c["n3yfl"] = valText{25, ""}
+	c["PingP0ng"] = valText{100, ""}
+	c["Punkte"] = valText{10, ""}
+	c["Vorspire"] = valText{10, ""}
+	c["Coman Nail"] = valText{50, ""}
+
+	// function to sort correctly.
+	f := func(kp map[string]valText) contributeList {
+		contrib := make(contributeList, len(kp))
+		i := 0
+
+		for k, v := range kp {
+			contrib[i] = contributor{Handle: k, Message: v.Message, Amount: v.Value}
+			i++
+		}
+
+		sort.Sort(sort.Reverse(contrib))
+		return contrib
+	}
+
+	sortedContributors := f(c)
+
+	var res string
+	for _, p := range sortedContributors {
+		var sub string
+		if p.Message != "" {
+			sub = "  => " + p.Message
+		}
+
+		res += fmt.Sprintf("%4d - %s %s\n", p.Amount, p.Handle, sub)
+	}
+
+	return header + "```" + res + "```"
 }

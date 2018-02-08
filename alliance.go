@@ -89,10 +89,8 @@ func (cfg *Config) CoreAlliance(dat *IOdata) error {
 			return err
 		}
 	} else if key != "" {
-		if err := cfg.AllianceJoin(name, key, dat.guild); err != nil {
-			return err
-		}
-		return nil
+		err := cfg.AllianceJoin(name, key, dat.guild)
+		return err
 	}
 
 	return nil
@@ -322,10 +320,8 @@ func (ally *Alliance) Update() error {
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			// Add to DB since it doesn't exist.
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
+			err := dbdat.dbInsert()
+			return err
 		}
 		return err
 	}
@@ -347,11 +343,10 @@ func (ally *Alliance) Delete() error {
 	}
 
 	var a = dbdat.Document.(Alliance)
-	if err := dbdat.dbDeleteID(a.ID); err != nil {
-		return err
-	}
+	err := dbdat.dbDeleteID(a.ID)
 
-	return nil
+	return err
+
 }
 
 // AlliancesLoad grabs all current alliances from database.

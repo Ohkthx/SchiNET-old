@@ -52,7 +52,7 @@ func (cfg *Config) messageCreateHandler(s *discordgo.Session, m *discordgo.Messa
 	} else if c.Type == discordgo.ChannelTypeDM {
 		// Handle private messages.
 		if strings.Contains(m.Content, "help") {
-			helptxt := fmt.Sprintf("Join us at: %s\n\nCheck out the Documentation at:\n%s\n", envBotGuild, helpDocs)
+			helptxt := fmt.Sprintf("Join us at: %s\n\nCheck out the Documentation at:\n%s\n", ConfigFile.GuildURL, helpDocs)
 			s.ChannelMessageSendEmbed(c.ID, embedCreator(helptxt, ColorGray))
 		}
 

@@ -235,10 +235,8 @@ func (t *Ticket) Update() error {
 				return err
 			}
 			t.TicketID = n
-			if err := dbdat.dbInsert(); err != nil {
-				return err
-			}
-			return nil
+			err = dbdat.dbInsert()
+			return err
 		}
 		return err
 	}
